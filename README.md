@@ -4,6 +4,7 @@ A local-first learning platform for a first-year CSE student working through the
 **Journey to Mars** project. Vanilla HTML, CSS and JavaScript only. No backend,
 no build step, no paid services.
 
+ https://luthfan-tech.github.io/orbit-learning/
 ---
 
 ## Run it locally
