@@ -1,5 +1,10 @@
 /* =========================================================================
-   Orbit — app.js (Fixed Routing & Sidebar)
+   Orbit — Phase 1 application script
+   Same state shape, same STORAGE_KEY ('orbit.v3'), same SCHEMA_VERSION.
+   Rendering layer rewritten for the warm editorial workspace direction.
+   All non-home routes (lessons, playground, terminal, timer, data, quizzes
+   editor, module editor, resource editor) still dispatch to preserved
+   handlers and legacy render functions — Phase 2 will re-lay those out.
    ========================================================================= */
 
 (function () {
@@ -21,32 +26,12 @@
     );
   const uid = (p) => p + "_" + Math.random().toString(36).slice(2, 8);
   const nowISO = () => new Date().toISOString();
-  const paragraphs = (t) =>
-    String(t || "")
-      .split(/\n\s*\n/)
-      .filter(Boolean)
-      .map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>")
-      .join("");
 
-  function fmtClock(s) {
-    s = Math.max(0, Math.round(s));
-    return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60]
-      .map((n) => String(n).padStart(2, "0"))
-      .join(":");
-  }
-  function fmtDur(s) {
-    s = Math.max(0, Math.round(s));
-    const h = Math.floor(s / 3600),
-      m = Math.floor((s % 3600) / 60),
-      sec = s % 60;
-    if (h) return h + "h " + m + "m";
-    if (m) return m + "m " + sec + "s";
-    return sec + "s";
-  }
   function fmtDate(iso) {
     if (!iso) return "—";
     try {
       return new Date(iso).toLocaleDateString(undefined, {
+        year: "numeric",
         month: "short",
         day: "numeric",
       });
@@ -54,49 +39,30 @@
       return iso;
     }
   }
+  function fmtDur(sec) {
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600),
+      m = Math.floor((sec % 3600) / 60),
+      s = sec % 60;
+    if (h) return h + " h " + m + " min";
+    if (m) return m + " min";
+    return s + " s";
+  }
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.round(sec));
+    return [Math.floor(sec / 3600), Math.floor((sec % 3600) / 60), sec % 60]
+      .map((n) => String(n).padStart(2, "0"))
+      .join(":");
+  }
+  function paragraphs(t) {
+    return String(t || "")
+      .split(/\n\s*\n/)
+      .filter(Boolean)
+      .map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>")
+      .join("");
+  }
 
-  /* ==================== ICONS ==================== */
-  const ICONS = {
-    home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
-    book: '<svg viewBox="0 0 24 24"><path d="M4 4h11a3 3 0 013 3v13H7a3 3 0 01-3-3V4z"/><path d="M4 17a3 3 0 013-3h11"/></svg>',
-    users:
-      '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 21c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="18" cy="7" r="2.5"/><path d="M22 19c0-2.5-2-4.5-4.5-4.5"/></svg>',
-    chart:
-      '<svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 16v-4"/><path d="M11 16V8"/><path d="M16 16v-7"/></svg>',
-    terminal:
-      '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M7 9l3 3-3 3"/><path d="M13 15h4"/></svg>',
-    clock:
-      '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-    code: '<svg viewBox="0 0 24 24"><path d="M8 6l-5 6 5 6"/><path d="M16 6l5 6-5 6"/></svg>',
-    data: '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
-    search:
-      '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
-    moon: '<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>',
-    sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>',
-    bell: '<svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg>',
-    arrowR:
-      '<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
-    arrowUp:
-      '<svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>',
-    arrowDown:
-      '<svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M6 13l6 6 6-6"/></svg>',
-    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
-    edit: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
-    trash:
-      '<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>',
-    eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
-    close: '<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>',
-    play: '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor"/></svg>',
-    check: '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
-    flag: '<svg viewBox="0 0 24 24"><path d="M4 3h13l-2 4 2 4H4z"/><path d="M4 3v18"/></svg>',
-    star: '<svg viewBox="0 0 24 24"><path d="M12 2l3 6 6 1-4.5 4.5L17.5 20 12 17 6.5 20 8 13.5 3.5 9l6-1z"/></svg>',
-    warn: '<svg viewBox="0 0 24 24"><path d="M12 2L2 21h20L12 2z"/><path d="M12 9v6M12 18v.01"/></svg>',
-    rocket:
-      '<svg viewBox="0 0 24 24"><path d="M4 20c2-2 3-4 3-7 0-5 4-9 9-11 2 2 3 5 3 8 0 4-3 7-7 8-3 1-5 2-8 2z"/><circle cx="15" cy="9" r="2"/></svg>',
-    menu: '<svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
-  };
-
-  /* ==================== STATE ==================== */
+  /* ---------- State ---------- */
   let state = null;
   let timer = { running: false, seconds: 0, intervalId: null, record: false };
   let loginDraft = { role: "student", selectedId: "stu-aarav" };
@@ -125,7 +91,9 @@
         try {
           localStorage.setItem("orbit.backup." + Date.now(), raw);
         } catch {}
-        toast("Saved data was from an older version. A backup was kept.");
+        toast(
+          "Saved data came from an older version. A backup was kept and a fresh store was started.",
+        );
         return defaultState();
       }
       parsed.curriculum = parsed.curriculum || starterCurriculum();
@@ -145,7 +113,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      toast("Could not save — storage may be full.");
+      toast("Could not save — browser storage may be full.");
     }
   }
 
@@ -159,7 +127,7 @@
     } catch {}
   });
 
-  /* ==================== DATA HELPERS ==================== */
+  /* ---------- Data helpers (unchanged) ---------- */
   function bucket(accountId) {
     if (!state.progress[accountId]) {
       state.progress[accountId] = {
@@ -219,7 +187,7 @@
   }
   const myId = () => (state.session ? state.session.accountId : VISITOR.id);
 
-  /* ==================== ROUTER ==================== */
+  /* ---------- Router ---------- */
   function parseHash() {
     const raw = location.hash.replace(/^#/, "") || "login";
     const parts = raw.split("/").filter(Boolean);
@@ -246,11 +214,7 @@
     let html = "";
     if (route === "login") {
       if (state.session) {
-        go(
-          currentAccount().role === "teacher"
-            ? "teacher/curriculum"
-            : "student",
-        );
+        go(currentAccount().role === "teacher" ? "teacher" : "student");
         return;
       }
       html = renderLogin();
@@ -260,7 +224,7 @@
         go("login");
         return;
       }
-      html = renderTeacherShell(sub || "curriculum");
+      html = renderTeacherShell(sub || "home");
     } else if (route === "student") {
       const a = currentAccount();
       if (!a) {
@@ -270,14 +234,11 @@
       html = renderStudentShell(sub, id);
     } else {
       html =
-        '<div class="empty"><div class="em">🛰</div><p>That page does not exist. <a href="#login">Go back</a>.</p></div>';
+        '<div class="empty">That page does not exist. <a href="#login">Go back</a>.</div>';
     }
     $("#app").innerHTML = html;
-
-    // Ensure the sidebar starts closed on mobile after navigation
     $("#sidebar")?.classList.remove("open");
     $(".sidebar-backdrop")?.classList.remove("show");
-
     const h = $("#main-heading");
     if (h) {
       h.setAttribute("tabindex", "-1");
@@ -285,7 +246,7 @@
     }
   }
 
-  /* ==================== UI UTILS ==================== */
+  /* ---------- Toast / dialog ---------- */
   let toastTimer = null;
   function toast(msg) {
     const el = $("#toast");
@@ -295,28 +256,28 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
   }
-  function openModal(title, body, opts) {
+  function openDialog(title, body, opts) {
     opts = opts || {};
     $("#modal-root").innerHTML =
-      '<div class="modal-backdrop">' +
-      '<div class="modal ' +
+      '<div class="dialog-backdrop">' +
+      '<div class="dialog ' +
       (opts.wide ? "wide" : "") +
-      '" role="dialog" aria-modal="true" aria-labelledby="mt">' +
-      '<div class="modal-head"><h2 id="mt">' +
+      '" role="dialog" aria-modal="true" aria-labelledby="dlg-title">' +
+      '<div class="dialog-head"><h2 id="dlg-title">' +
       esc(title) +
       "</h2>" +
-      '<button class="icon-btn" type="button" data-action="modal-close" aria-label="Close">' +
-      ICONS.close +
-      "</button>" +
+      '<button class="icon-close" type="button" data-action="modal-close" aria-label="Close">✕</button>' +
       "</div>" +
-      '<div class="modal-body">' +
+      '<div class="dialog-body">' +
       body +
       "</div>" +
-      (opts.footer ? '<div class="modal-foot">' + opts.footer + "</div>" : "") +
+      (opts.footer
+        ? '<div class="dialog-foot">' + opts.footer + "</div>"
+        : "") +
       "</div>" +
       "</div>";
     const first = $(
-      "#modal-root input, #modal-root textarea, #modal-root button",
+      "#modal-root input, #modal-root textarea, #modal-root select, #modal-root button",
     );
     if (first) first.focus({ preventScroll: true });
   }
@@ -324,7 +285,7 @@
     $("#modal-root").innerHTML = "";
   }
   function openConfirm(title, msg, onConfirm, label) {
-    openModal(title, msg, {
+    openDialog(title, msg, {
       footer:
         '<button class="btn ghost" type="button" data-action="modal-close">Cancel</button>' +
         '<button class="btn primary" type="button" id="cfyes">' +
@@ -337,7 +298,7 @@
     });
   }
 
-  /* ==================== LOGIN ==================== */
+  /* ---------- Login ---------- */
   function renderLogin() {
     const role = loginDraft.role;
     const profiles = ACCOUNTS.filter((a) => a.role === role);
@@ -353,7 +314,7 @@
           '"' +
           (p.id === loginDraft.selectedId ? " checked" : "") +
           ">" +
-          '<span><span class="av">' +
+          '<span><span class="initials">' +
           esc(p.initials) +
           "</span>" +
           esc(p.name) +
@@ -366,30 +327,19 @@
       (a) =>
         "<li><strong>" +
         esc(a.name) +
-        "</strong> — <code>" +
+        "</strong> · <code>" +
         esc(a.key) +
         "</code></li>",
     ).join("");
 
     return (
-      '<div class="login-shell">' +
-      '<aside class="login-visual">' +
-      '<div class="brand"><span class="logo">O</span> Orbit</div>' +
-      "<div>" +
-      "<h1>Learn by building.</h1>" +
-      "<p>A calm, project-based space to practise HTML, CSS and JavaScript. Short sessions, real results, no pressure.</p>" +
-      '<div class="float-stats">' +
-      '<div class="float-stat"><strong>4</strong>modules</div>' +
-      '<div class="float-stat"><strong>60m</strong>per day</div>' +
-      '<div class="float-stat"><strong>∞</strong>retries</div>' +
-      "</div>" +
-      "</div>" +
-      "</aside>" +
-      '<div class="login-panel">' +
+      '<div class="login-wrap">' +
       '<div class="login-card">' +
-      "<h2>Welcome back</h2>" +
-      "<p>Sign in to continue your Journey to Mars.</p>" +
-      '<div class="role-tabs" role="tablist">' +
+      '<div class="brand">Orbit</div>' +
+      '<div class="tagline">learning workspace</div>' +
+      "<h1>Sign in</h1>" +
+      '<p class="lede">A quiet workspace for two people learning together. Choose a profile to continue.</p>' +
+      '<div class="role-tabs" role="tablist" aria-label="Role">' +
       '<button type="button" role="tab" aria-selected="' +
       (role === "student") +
       '" data-action="login-role" data-role="student">Student</button>' +
@@ -398,455 +348,524 @@
       '" data-action="login-role" data-role="teacher">Teacher</button>' +
       "</div>" +
       '<form data-form="login">' +
-      '<fieldset style="border:0;padding:0;margin:0 0 1rem"><legend style="padding:0;margin-bottom:.5rem">Choose a profile</legend>' +
+      '<fieldset style="border:0;padding:0;margin:0 0 1rem"><legend class="hint" style="padding:0;margin-bottom:0.4rem">Profile</legend>' +
       '<div class="profile-list">' +
       options +
       "</div>" +
       "</fieldset>" +
       '<label class="field"><span>Access key</span>' +
-      '<input type="password" name="key" required autocomplete="off" spellcheck="false" placeholder="Enter your key">' +
+      '<input type="password" name="key" required autocomplete="off" spellcheck="false" placeholder="enter your key">' +
       "</label>" +
       '<button class="btn primary block" type="submit">Continue</button>' +
       "</form>" +
       '<div class="login-foot">' +
-      'Just exploring? <a href="#" data-action="visitor-login">Continue as visitor</a>' +
+      'Just exploring? <button type="button" class="link-btn" data-action="visitor-login">Continue as visitor</button>' +
       "</div>" +
-      '<details class="demo-keys"><summary>Demo keys</summary><ul>' +
+      '<details class="demo-keys"><summary>Demo access keys</summary><ul>' +
       keys +
       "</ul></details>" +
-      "</div>" +
       "</div>" +
       "</div>"
     );
   }
 
-  /* ==================== SHELLS ==================== */
-  function sidebarNav(items, active) {
-    return items
-      .map(
-        (item) =>
-          '<a href="#' +
-          item.path +
-          '"' +
-          (item.path === active ? ' aria-current="page"' : "") +
-          ">" +
-          '<span class="ico">' +
-          (ICONS[item.icon] || "") +
-          "</span>" +
-          esc(item.label) +
-          "</a>",
-      )
-      .join("");
+  /* ---------- Sidebar / shell ---------- */
+  function navGroup(title, items, active) {
+    return (
+      '<div class="nav-group">' +
+      '<div class="label">' +
+      esc(title) +
+      "</div>" +
+      items
+        .map(
+          (item) =>
+            '<a href="#' +
+            item.path +
+            '"' +
+            (item.path === active ? ' aria-current="page"' : "") +
+            ">" +
+            esc(item.label) +
+            "</a>",
+        )
+        .join("") +
+      "</div>"
+    );
   }
 
-  function shell(navItems, activePath, content) {
+  function shell(navItems, activePath, content, opts) {
+    opts = opts || {};
     const a = currentAccount();
     return (
       '<div class="app">' +
       '<div class="sidebar-backdrop" data-action="close-sidebar"></div>' +
-      '<aside class="sidebar" id="sidebar">' +
-      '<div class="brand"><span class="logo">O</span> Orbit</div>' +
-      '<div class="nav">' +
-      sidebarNav(navItems, activePath) +
+      '<aside class="sidebar" id="sidebar" aria-label="Main navigation">' +
+      '<div class="brand">' +
+      '<a class="name" href="#' +
+      (a.role === "teacher" ? "teacher" : "student") +
+      '">Orbit</a>' +
+      '<div class="tagline">learning workspace</div>' +
       "</div>" +
-      '<div class="side-spacer"></div>' +
-      '<div class="side-promo">' +
-      "<h4>Keep the momentum</h4>" +
-      "<p>One hour a day is enough. Small wins add up.</p>" +
-      '<button type="button" data-action="promo-timer">Open timer</button>' +
-      "</div>" +
-      '<div class="side-user">' +
-      '<div class="avatar">' +
+      navItems +
+      '<div class="spacer"></div>' +
+      '<div class="user-box">' +
+      '<span class="initials" aria-hidden="true">' +
       esc(a.initials) +
-      "</div>" +
+      "</span>" +
       '<div class="meta"><div class="name">' +
       esc(a.name) +
       '</div><div class="role">' +
       esc(a.role) +
       "</div></div>" +
-      '<button type="button" class="signout" data-action="logout" title="Sign out">↗</button>' +
+      '<a class="switch" href="#" data-action="logout" title="Sign out">Switch</a>' +
       "</div>" +
       "</aside>" +
-      '<div class="main">' +
+      '<main class="main" id="main">' +
       '<div class="main-inner">' +
       '<div class="topbar">' +
-      '<button type="button" class="mobile-toggle" data-action="toggle-sidebar" aria-label="Open menu">' +
-      ICONS.menu +
+      '<button type="button" class="menu-btn" data-action="toggle-sidebar" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar">Menu</button>' +
+      '<button class="theme-btn" type="button" data-action="toggle-theme" aria-label="Toggle light and dark mode">' +
+      (state.ui.theme === "dark" ? "Light" : "Dark") +
       "</button>" +
-      '<div class="search">' +
-      ICONS.search +
-      '<input type="text" placeholder="Search modules, resources…" aria-label="Search"></div>' +
-      '<div class="top-actions">' +
-      '<button class="icon-btn" type="button" data-action="toggle-theme" aria-label="Toggle theme">' +
-      (state.ui.theme === "dark" ? ICONS.sun : ICONS.moon) +
-      "</button>" +
-      '<button class="icon-btn" type="button" aria-label="Notifications">' +
-      ICONS.bell +
-      "</button>" +
-      "</div>" +
       "</div>" +
       content +
       "</div>" +
-      "</div>" +
+      "</main>" +
       "</div>"
     );
   }
 
-  /* ==================== TEACHER VIEWS ==================== */
-  const TEACHER_NAV = [
-    { path: "teacher/curriculum", label: "Curriculum", icon: "book" },
-    { path: "teacher/resources", label: "Resources", icon: "code" },
-    { path: "teacher/challenges", label: "Challenges", icon: "flag" },
-    { path: "teacher/quizzes", label: "Quizzes", icon: "star" },
-    { path: "teacher/students", label: "Students", icon: "users" },
-    { path: "teacher/data", label: "Data", icon: "data" },
-  ];
+  /* ---------- STUDENT NAV ---------- */
+  const STUDENT_NAV_HTML = (active) =>
+    navGroup(
+      "Learn",
+      [
+        { path: "student", label: "Home" },
+        { path: "student/explore", label: "Explore" },
+        { path: "student/prompt-lab", label: "Prompt lab" },
+        { path: "student/notes", label: "Notes" },
+        { path: "student/lessons", label: "Lessons" },
+        { path: "student/projects", label: "Projects" },
+      ],
+      active,
+    ) +
+    navGroup(
+      "Workspace",
+      [
+        { path: "student/playground", label: "Playground" },
+        { path: "student/terminal", label: "Terminal" },
+        { path: "student/timer", label: "Study timer" },
+      ],
+      active,
+    ) +
+    navGroup(
+      "Share",
+      [{ path: "student/data", label: "Data & sharing" }],
+      active,
+    );
 
-  function renderTeacherShell(tab) {
-    const views = {
+  /* ---------- STUDENT views ---------- */
+  function renderStudentShell(sub, id) {
+    if (sub === "lesson" && id) {
+      return shell(
+        STUDENT_NAV_HTML("student/lessons"),
+        "student/lessons",
+        studentLesson(id),
+      );
+    }
+    const map = {
+      "": { active: "student", view: studentHome },
+      explore: {
+        active: "student/explore",
+        view: studentPlaceholder("Explore"),
+      },
+      "prompt-lab": {
+        active: "student/prompt-lab",
+        view: studentPlaceholder("Prompt lab"),
+      },
+      notes: { active: "student/notes", view: studentPlaceholder("Notes") },
+      lessons: { active: "student/lessons", view: studentLessonsList },
+      projects: {
+        active: "student/projects",
+        view: studentPlaceholder("Projects"),
+      },
+      playground: { active: "student/playground", view: studentPlayground },
+      terminal: { active: "student/terminal", view: studentTerminal },
+      timer: { active: "student/timer", view: studentTimer },
+      data: { active: "student/data", view: dataView },
+    };
+    const entry = map[sub || ""] || map[""];
+    return shell(STUDENT_NAV_HTML(entry.active), entry.active, entry.view());
+  }
+
+  function studentPlaceholder(label) {
+    return function () {
+      return (
+        '<div class="page-head">' +
+        '<div class="eyebrow">' +
+        esc(label) +
+        "</div>" +
+        '<h1 id="main-heading">' +
+        esc(label) +
+        "</h1>" +
+        '<p class="lede">This section is being rebuilt in Phase 2. Your notes, drafts, and progress remain safe in this browser.</p>' +
+        "</div>" +
+        '<div class="empty-state"><strong>Phase 2</strong>' +
+        "The " +
+        esc(label) +
+        " page will get its own reading layout and interactions in the next phase." +
+        "</div>"
+      );
+    };
+  }
+
+  /* ---------- STUDENT HOME ---------- */
+  function studentHome() {
+    const accId = myId();
+    const account = currentAccount();
+    const list = publishedModules();
+    const done = completedCount(accId);
+    const target =
+      list.find((m) => readRecord(accId, m).status === "in-progress") ||
+      list.find((m) => readRecord(accId, m).status === "not-started") ||
+      list[0] ||
+      null;
+
+    const b = bucket(accId);
+    const questions = (b.questions || []).slice();
+    const notes = (b.notes || [])
+      .slice()
+      .sort((x, y) => String(y.updatedAt).localeCompare(String(x.updatedAt)))
+      .slice(0, 4);
+
+    const firstInitial = account.name.split(" ")[0];
+
+    const continueBlock = target
+      ? '<section class="continue-card">' +
+        '<div class="label">Continue learning</div>' +
+        "<h3>" +
+        esc(target.title) +
+        "</h3>" +
+        "<p>" +
+        esc(target.goal) +
+        "</p>" +
+        '<div class="actions">' +
+        '<a class="btn primary" href="#student/lesson/' +
+        esc(target.id) +
+        '">' +
+        (readRecord(accId, target).status === "in-progress"
+          ? "Continue lesson"
+          : "Start lesson") +
+        "</a>" +
+        '<a class="btn ghost" href="#student/lessons">All lessons</a>' +
+        '<span class="hint">' +
+        esc(target.estimatedMinutes) +
+        " min · " +
+        (target.sessions || []).length +
+        " sessions</span>" +
+        "</div>" +
+        "</section>"
+      : '<section class="continue-card">' +
+        '<div class="label">Continue learning</div>' +
+        "<h3>No published lessons yet</h3>" +
+        "<p>Your teacher will publish the first module when it is ready.</p>" +
+        '<div class="actions"><a class="btn" href="#student/lessons">Browse lessons</a></div>' +
+        "</section>";
+
+    const focusItems = buildFocusItems(accId);
+    const focusBlock =
+      '<section class="section">' +
+      '<div class="section-head"><h2>Today, if you have an hour</h2><span class="count">optional</span></div>' +
+      '<ul class="focus-list">' +
+      focusItems
+        .map(
+          (f) =>
+            "<li>" +
+            '<span class="mark' +
+            (f.done ? " done" : "") +
+            '" aria-hidden="true">' +
+            (f.done ? "✓" : "") +
+            "</span>" +
+            '<div class="body">' +
+            esc(f.text) +
+            (f.when ? '<div class="when">' + esc(f.when) + "</div>" : "") +
+            "</div>" +
+            "</li>",
+        )
+        .join("") +
+      "</ul>" +
+      "</section>";
+
+    const questionsBlock =
+      '<section class="section">' +
+      '<div class="section-head"><h2>Questions I want to explore</h2><span class="count">' +
+      questions.length +
+      "</span></div>" +
+      (questions.length
+        ? '<ul class="questions">' +
+          questions.map((q) => "<li>" + esc(q.text) + "</li>").join("") +
+          "</ul>"
+        : '<p class="questions"><span class="q-empty">Nothing on your list yet. Add the first thing you\'re curious about.</span></p>') +
+      '<form class="question-form" data-form="add-question">' +
+      '<input type="text" name="text" placeholder="What are you wondering about?" maxlength="200" required aria-label="New question">' +
+      '<button class="btn sm" type="submit">Add</button>' +
+      "</form>" +
+      "</section>";
+
+    const notesBlock =
+      '<section class="section">' +
+      '<div class="section-head"><h2>Recently saved notes</h2><span class="count">' +
+      notes.length +
+      "</span></div>" +
+      (notes.length
+        ? '<ul class="notes-list">' +
+          notes
+            .map(
+              (n) =>
+                "<li>" +
+                '<div class="n-title">' +
+                esc(n.title || n.question || "Untitled note") +
+                "</div>" +
+                '<div class="n-meta">' +
+                esc(fmtDate(n.updatedAt || n.createdAt)) +
+                (n.checkedAt ? " · checked" : "") +
+                "</div>" +
+                "</li>",
+            )
+            .join("") +
+          "</ul>"
+        : '<p class="notes-empty">No notes yet. When you save one from Notes, it appears here.</p>') +
+      "</section>";
+
+    const progressBlock =
+      '<section class="section">' +
+      '<div class="section-head"><h2>This week</h2></div>' +
+      '<div class="progress-summary">' +
+      '<div><span class="num">' +
+      done +
+      "</span><small>of " +
+      list.length +
+      " lessons complete</small></div>" +
+      '<ul class="list">' +
+      "<li><strong>" +
+      b.quizAttempts.length +
+      "</strong> quiz attempts</li>" +
+      "<li><strong>" +
+      b.challengeResults.filter((c) => c.passed).length +
+      "</strong> challenges passed</li>" +
+      "<li><strong>" +
+      b.feedback.length +
+      "</strong> feedback notes sent</li>" +
+      "<li><strong>" +
+      fmtDur(b.studySessions.reduce((s, x) => s + (x.seconds || 0), 0)) +
+      "</strong> recorded study time</li>" +
+      "</ul>" +
+      '<p class="hint" style="margin-top:0.6rem">Study time is what you chose to record. It is not a measure of understanding.</p>' +
+      "</div>" +
+      "</section>";
+
+    const greeting = greetingFor(account.name);
+    const eyebrow = todayEyebrow();
+
+    return (
+      '<div class="page-head">' +
+      '<div class="eyebrow">' +
+      esc(eyebrow) +
+      "</div>" +
+      '<h1 id="main-heading">' +
+      esc(greeting) +
+      ", " +
+      esc(firstInitial) +
+      ".</h1>" +
+      '<p class="lede">A short session, when you have one. Everything is saved in this browser and stays yours.</p>' +
+      "</div>" +
+      '<div class="home-grid">' +
+      '<div class="home-main">' +
+      continueBlock +
+      focusBlock +
+      questionsBlock +
+      notesBlock +
+      "</div>" +
+      '<aside class="home-side">' +
+      progressBlock +
+      "</aside>" +
+      "</div>"
+    );
+  }
+
+  function greetingFor(name) {
+    const h = new Date().getHours();
+    const who = name.split(" ")[0];
+    if (h < 12) return "Good morning";
+    if (h < 18) return "Good afternoon";
+    return "Good evening";
+  }
+  function todayEyebrow() {
+    try {
+      return new Date().toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return "Today";
+    }
+  }
+
+  function buildFocusItems(accId) {
+    // Purposeful, optional suggestions. Not streaks, not rewards.
+    const items = [];
+    const inProg = publishedModules().find(
+      (m) => readRecord(accId, m).status === "in-progress",
+    );
+    if (inProg) {
+      items.push({
+        text: "Finish the current lesson: " + inProg.title,
+        when: "in progress",
+        done: false,
+      });
+    } else {
+      const next = publishedModules().find(
+        (m) => readRecord(accId, m).status === "not-started",
+      );
+      if (next)
+        items.push({
+          text: "Start " + next.title,
+          when: next.estimatedMinutes + " min",
+          done: false,
+        });
+    }
+    if (bucket(accId).questions.length === 0) {
+      items.push({
+        text: "Add one question you want to explore",
+        when: "takes a minute",
+        done: false,
+      });
+    }
+    if (bucket(accId).notes.length === 0) {
+      items.push({
+        text: "Write a short note in your own words",
+        when: "one idea is enough",
+        done: false,
+      });
+    }
+    if (items.length < 2) {
+      items.push({
+        text: "Revisit a lesson you liked",
+        when: "no pressure",
+        done: false,
+      });
+    }
+    return items.slice(0, 3);
+  }
+
+  /* ---------- STUDENT lessons list (kept functional; Phase 2 will restyle) ---------- */
+  function studentLessonsList() {
+    const accId = myId();
+    const list = publishedModules();
+    return (
+      '<div class="page-head">' +
+      '<div class="eyebrow">Lessons</div>' +
+      '<h1 id="main-heading">All lessons</h1>' +
+      '<p class="lede">Small lessons you can revisit. Nothing is timed.</p>' +
+      "</div>" +
+      (list.length
+        ? "<div>" +
+          list
+            .map((m, i) => {
+              const rec = readRecord(accId, m);
+              return (
+                '<div class="module-row">' +
+                '<span class="order">' +
+                (i + 1) +
+                "</span>" +
+                "<div>" +
+                '<div class="title">' +
+                esc(m.title) +
+                ' <span class="hint" style="margin-left:.4rem">· ' +
+                esc(statusLabel(rec.status)) +
+                "</span></div>" +
+                '<div class="meta">' +
+                esc(m.goal) +
+                " · " +
+                esc(m.estimatedMinutes) +
+                " min</div>" +
+                "</div>" +
+                '<div class="actions">' +
+                '<a class="btn sm" href="#student/lesson/' +
+                esc(m.id) +
+                '">' +
+                (rec.status === "completed"
+                  ? "Revisit"
+                  : rec.status === "in-progress"
+                    ? "Continue"
+                    : "Open") +
+                "</a>" +
+                "</div>" +
+                "</div>"
+              );
+            })
+            .join("") +
+          "</div>"
+        : '<div class="empty-state"><strong>No published lessons yet.</strong>When your teacher publishes a module it will appear here.</div>')
+    );
+  }
+  function statusLabel(s) {
+    if (s === "completed") return "Completed";
+    if (s === "in-progress") return "In progress";
+    return "Not started";
+  }
+
+  /* ---------- TEACHER NAV ---------- */
+  const TEACHER_NAV_HTML = (active) =>
+    navGroup(
+      "Teach",
+      [
+        { path: "teacher", label: "Home" },
+        { path: "teacher/curriculum", label: "Curriculum" },
+        { path: "teacher/resources", label: "Resources" },
+        { path: "teacher/challenges", label: "Challenges" },
+        { path: "teacher/quizzes", label: "Quizzes & polls" },
+        { path: "teacher/students", label: "Learner work" },
+      ],
+      active,
+    ) +
+    navGroup(
+      "Share",
+      [{ path: "teacher/data", label: "Data & sharing" }],
+      active,
+    );
+
+  function renderTeacherShell(sub) {
+    if (!sub || sub === "home") {
+      return shell(TEACHER_NAV_HTML("teacher"), "teacher", teacherHome());
+    }
+    const map = {
       curriculum: teacherCurriculum,
       resources: teacherResources,
       challenges: teacherChallenges,
       quizzes: teacherQuizzes,
       students: teacherStudents,
-      data: teacherData,
+      data: dataView,
     };
-    const view = (views[tab] || views.curriculum)();
-    return shell(TEACHER_NAV, "teacher/" + tab, view);
+    const view = map[sub] || teacherHome;
+    return shell(TEACHER_NAV_HTML("teacher/" + sub), "teacher/" + sub, view());
   }
 
-  function teacherCurriculum() {
+  /* ---------- TEACHER HOME ---------- */
+  function teacherHome() {
     const modules = state.curriculum.modules
       .slice()
       .sort((a, b) => a.order - b.order);
     const published = modules.filter((m) => m.published).length;
     const drafts = modules.length - published;
-
-    const rows = modules.length
-      ? modules
-          .map(
-            (m, i) =>
-              '<div class="module-row ' +
-              (m.published ? "" : "is-draft") +
-              '">' +
-              '<span class="order-badge">' +
-              (i + 1) +
-              "</span>" +
-              "<div>" +
-              '<div class="title">' +
-              esc(m.title) +
-              ' <span class="chip ' +
-              (m.published ? "done" : "draft") +
-              '">' +
-              (m.published ? "Published" : "Draft") +
-              "</span>" +
-              ' <span class="chip">v' +
-              m.version +
-              "</span>" +
-              "</div>" +
-              '<div class="meta">' +
-              "<span>" +
-              esc(m.estimatedMinutes) +
-              " min</span>" +
-              "<span>" +
-              (m.sessions || []).length +
-              " sessions</span>" +
-              "<span>" +
-              (m.checklist || []).length +
-              " checklist</span>" +
-              "</div>" +
-              "</div>" +
-              '<div class="actions">' +
-              '<button class="btn icon-only ghost" type="button" data-action="move-up" data-id="' +
-              esc(m.id) +
-              '" title="Move up"' +
-              (i === 0 ? " disabled" : "") +
-              ">" +
-              ICONS.arrowUp +
-              "</button>" +
-              '<button class="btn icon-only ghost" type="button" data-action="move-down" data-id="' +
-              esc(m.id) +
-              '" title="Move down"' +
-              (i === modules.length - 1 ? " disabled" : "") +
-              ">" +
-              ICONS.arrowDown +
-              "</button>" +
-              '<button class="btn icon-only ghost" type="button" data-action="toggle-publish" data-id="' +
-              esc(m.id) +
-              '" title="' +
-              (m.published ? "Unpublish" : "Publish") +
-              '">' +
-              ICONS.eye +
-              "</button>" +
-              '<button class="btn sm ghost" type="button" data-action="edit-module" data-id="' +
-              esc(m.id) +
-              '">Edit</button>' +
-              '<button class="btn icon-only danger" type="button" data-action="delete-module" data-id="' +
-              esc(m.id) +
-              '" title="Delete">' +
-              ICONS.trash +
-              "</button>" +
-              "</div>" +
-              "</div>",
-          )
-          .join("")
-      : '<div class="empty"><div class="em">📘</div><p>No modules yet. Add your first one.</p></div>';
-
-    return (
-      '<div class="greeting"><h1 id="main-heading">Curriculum</h1><p>Design the Journey to Mars — modules, lessons, and the order they appear in.</p></div>' +
-      '<div class="stats-row">' +
-      '<div class="stat"><div class="ico violet">' +
-      ICONS.book +
-      '</div><div><div class="num">' +
-      modules.length +
-      '</div><div class="lbl">Modules</div></div></div>' +
-      '<div class="stat"><div class="ico teal">' +
-      ICONS.check +
-      '</div><div><div class="num">' +
-      published +
-      '</div><div class="lbl">Published</div></div></div>' +
-      '<div class="stat"><div class="ico amber">' +
-      ICONS.edit +
-      '</div><div><div class="num">' +
-      drafts +
-      '</div><div class="lbl">Drafts</div></div></div>' +
-      '<div class="stat"><div class="ico pink">' +
-      ICONS.users +
-      '</div><div><div class="num">' +
-      ACCOUNTS.filter((a) => a.role === "student").length +
-      '</div><div class="lbl">Students</div></div></div>' +
-      "</div>" +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>All modules</h2>' +
-      '<button class="btn primary sm" type="button" data-action="add-module">' +
-      ICONS.plus +
-      " New module</button>" +
-      "</div>" +
-      '<div class="module-rows">' +
-      rows +
-      "</div>" +
-      "</div>"
-    );
-  }
-
-  function teacherResources() {
-    const rows = state.curriculum.resources
-      .map(
-        (r) =>
-          '<div class="module-row">' +
-          '<span class="order-badge">' +
-          (r.type === "link" ? "↗" : r.type === "snippet" ? "{}" : "✎") +
-          "</span>" +
-          "<div>" +
-          '<div class="title">' +
-          esc(r.title) +
-          ' <span class="chip">' +
-          esc(r.type) +
-          "</span>" +
-          (r.needsVerification
-            ? ' <span class="chip warn">Unverified</span>'
-            : "") +
-          "</div>" +
-          '<div class="meta">' +
-          (r.url ? esc(r.url) : '<span class="muted">local note</span>') +
-          "</div>" +
-          "</div>" +
-          '<div class="actions">' +
-          '<button class="btn sm ghost" type="button" data-action="preview-resource" data-id="' +
-          esc(r.id) +
-          '">Preview</button>' +
-          '<button class="btn sm ghost" type="button" data-action="edit-resource" data-id="' +
-          esc(r.id) +
-          '">Edit</button>' +
-          '<button class="btn icon-only danger" type="button" data-action="delete-resource" data-id="' +
-          esc(r.id) +
-          '">' +
-          ICONS.trash +
-          "</button>" +
-          "</div>" +
-          "</div>",
-      )
-      .join("");
-
-    return (
-      '<div class="greeting"><h1 id="main-heading">Resources</h1><p>Links, notes and code snippets that support each module.</p></div>' +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>Library</h2>' +
-      '<button class="btn primary sm" type="button" data-action="add-resource">' +
-      ICONS.plus +
-      " New resource</button>" +
-      "</div>" +
-      (rows
-        ? '<div class="module-rows">' + rows + "</div>"
-        : '<div class="empty"><div class="em">📎</div><p>No resources yet.</p></div>') +
-      "</div>"
-    );
-  }
-
-  function teacherChallenges() {
-    const rows = state.curriculum.challenges
-      .map(
-        (c) =>
-          '<div class="module-row">' +
-          '<span class="order-badge">⚑</span>' +
-          "<div>" +
-          '<div class="title">' +
-          esc(c.title) +
-          ' <span class="chip">' +
-          (c.checkType === "console" ? "Console match" : "Self-check") +
-          "</span></div>" +
-          '<div class="meta">' +
-          (c.checkType === "console"
-            ? "Expected: " + esc(c.expectedOutput || "—")
-            : (c.checklist || []).length + " checklist items") +
-          "</div>" +
-          "</div>" +
-          '<div class="actions">' +
-          '<button class="btn sm ghost" type="button" data-action="edit-challenge" data-id="' +
-          esc(c.id) +
-          '">Edit</button>' +
-          '<button class="btn icon-only danger" type="button" data-action="delete-challenge" data-id="' +
-          esc(c.id) +
-          '">' +
-          ICONS.trash +
-          "</button>" +
-          "</div>" +
-          "</div>",
-      )
-      .join("");
-
-    return (
-      '<div class="greeting"><h1 id="main-heading">Challenges</h1><p>Practical exercises with clear checking methods.</p></div>' +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>All challenges</h2>' +
-      '<button class="btn primary sm" type="button" data-action="add-challenge">' +
-      ICONS.plus +
-      " New challenge</button>" +
-      "</div>" +
-      (rows
-        ? '<div class="module-rows">' + rows + "</div>"
-        : '<div class="empty"><div class="em">⚑</div><p>No challenges yet.</p></div>') +
-      "</div>"
-    );
-  }
-
-  function teacherQuizzes() {
-    const quizRows = state.curriculum.quizzes
-      .map(
-        (q) =>
-          '<div class="module-row">' +
-          '<span class="order-badge">?</span>' +
-          '<div><div class="title">' +
-          esc(q.title) +
-          "</div>" +
-          '<div class="meta">' +
-          q.questions.length +
-          " questions</div></div>" +
-          '<div class="actions">' +
-          '<button class="btn sm ghost" type="button" data-action="edit-quiz" data-id="' +
-          esc(q.id) +
-          '">Edit</button>' +
-          '<button class="btn icon-only danger" type="button" data-action="delete-quiz" data-id="' +
-          esc(q.id) +
-          '">' +
-          ICONS.trash +
-          "</button>" +
-          "</div>" +
-          "</div>",
-      )
-      .join("");
-
-    const pollRows = state.curriculum.polls
-      .map(
-        (p) =>
-          '<div class="module-row">' +
-          '<span class="order-badge">◔</span>' +
-          '<div><div class="title">' +
-          esc(p.title) +
-          "</div>" +
-          '<div class="meta">' +
-          esc(p.question) +
-          "</div></div>" +
-          '<div class="actions">' +
-          '<button class="btn sm ghost" type="button" data-action="edit-poll" data-id="' +
-          esc(p.id) +
-          '">Edit</button>' +
-          '<button class="btn icon-only danger" type="button" data-action="delete-poll" data-id="' +
-          esc(p.id) +
-          '">' +
-          ICONS.trash +
-          "</button>" +
-          "</div>" +
-          "</div>",
-      )
-      .join("");
-
-    return (
-      '<div class="greeting"><h1 id="main-heading">Quizzes &amp; polls</h1><p>Check understanding. Unlimited retries, no penalties.</p></div>' +
-      '<div class="panel" style="margin-bottom:1rem">' +
-      '<div class="panel-head"><h2>Quizzes</h2>' +
-      '<button class="btn primary sm" type="button" data-action="add-quiz">' +
-      ICONS.plus +
-      " New quiz</button></div>" +
-      (quizRows
-        ? '<div class="module-rows">' + quizRows + "</div>"
-        : '<div class="empty"><div class="em">?</div><p>No quizzes yet.</p></div>') +
-      "</div>" +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>Polls &amp; reflection</h2>' +
-      '<button class="btn primary sm" type="button" data-action="add-poll">' +
-      ICONS.plus +
-      " New poll</button></div>" +
-      (pollRows
-        ? '<div class="module-rows">' + pollRows + "</div>"
-        : '<div class="empty"><div class="em">◔</div><p>No polls yet.</p></div>') +
-      "</div>"
-    );
-  }
-
-  function teacherStudents() {
     const students = ACCOUNTS.filter((a) => a.role === "student");
-    const rows = students
-      .map((acc) => {
-        const b = bucket(acc.id);
-        const done = completedCount(acc.id);
-        const mins =
-          b.studySessions.reduce((s, x) => s + (x.seconds || 0), 0) / 60;
-        return (
-          "<tr>" +
-          '<td><span class="row-avatar"><span class="av">' +
-          esc(acc.initials) +
-          "</span>" +
-          esc(acc.name) +
-          "</span></td>" +
-          "<td>" +
-          done +
-          " / " +
-          publishedModules().length +
-          "</td>" +
-          "<td>" +
-          b.quizAttempts.length +
-          "</td>" +
-          "<td>" +
-          b.challengeResults.filter((c) => c.passed).length +
-          "</td>" +
-          "<td>" +
-          b.feedback.length +
-          "</td>" +
-          "<td>" +
-          Math.round(mins) +
-          " min</td>" +
-          "</tr>"
-        );
-      })
-      .join("");
 
-    const allFeedback = [];
+    const recentFeedback = [];
     Object.keys(state.progress).forEach((accId) => {
       const acc = ACCOUNTS.find((a) => a.id === accId);
       const label = acc ? acc.name : accId === VISITOR.id ? "Visitor" : accId;
       (state.progress[accId].feedback || []).forEach((f) => {
-        allFeedback.push({
+        recentFeedback.push({
           label,
           moduleId: f.moduleId,
           sentiment: f.sentiment,
@@ -855,372 +874,129 @@
         });
       });
     });
-    allFeedback.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-    const fbRows = allFeedback
-      .slice(0, 12)
-      .map(
-        (f) =>
-          "<tr><td>" +
-          esc(f.label) +
-          "</td><td>" +
-          esc(f.moduleId) +
-          "</td>" +
-          '<td><span class="chip">' +
-          esc(f.sentiment) +
-          "</span></td>" +
-          "<td>" +
-          esc(f.note || "—") +
-          "</td>" +
-          '<td class="muted" style="font-size:.78rem">' +
-          esc(fmtDate(f.at)) +
-          "</td></tr>",
-      )
-      .join("");
+    recentFeedback.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+
+    const pendingDrafts = modules.filter((m) => !m.published);
 
     return (
-      '<div class="greeting"><h1 id="main-heading">Students</h1><p>Progress from this browser only. Import a progress file to see data from other devices.</p></div>' +
-      '<div class="panel" style="margin-bottom:1rem">' +
-      '<div class="panel-head"><h2>Overview</h2></div>' +
-      '<div class="table-wrap"><table>' +
-      "<thead><tr><th>Learner</th><th>Modules</th><th>Quizzes</th><th>Challenges</th><th>Feedback</th><th>Study time</th></tr></thead>" +
-      "<tbody>" +
-      rows +
-      "</tbody>" +
-      "</table></div>" +
+      '<div class="page-head">' +
+      '<div class="eyebrow">' +
+      esc(todayEyebrow()) +
       "</div>" +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>Recent feedback</h2></div>' +
-      (fbRows
-        ? '<div class="table-wrap"><table><thead><tr><th>Learner</th><th>Module</th><th>Signal</th><th>Note</th><th>When</th></tr></thead><tbody>' +
-          fbRows +
-          "</tbody></table></div>"
-        : '<div class="empty"><div class="em">💬</div><p>No feedback recorded yet.</p></div>') +
-      "</div>"
-    );
-  }
-
-  function teacherData() {
-    return dataView();
-  }
-
-  function dataView() {
-    return (
-      '<div class="greeting"><h1 id="main-heading">Data</h1><p>Everything lives in this browser. Export a file to move it between devices.</p></div>' +
-      '<div class="panel" style="margin-bottom:1rem">' +
-      '<div class="panel-head"><h2>Export</h2></div>' +
-      '<div class="row" style="display:flex;gap:.6rem;flex-wrap:wrap">' +
-      '<button class="btn" type="button" data-action="export-curriculum">' +
-      ICONS.data +
-      " Curriculum</button>" +
-      '<button class="btn" type="button" data-action="export-progress">' +
-      ICONS.data +
-      " Progress</button>" +
-      '<button class="btn primary" type="button" data-action="export-full">' +
-      ICONS.data +
-      " Full backup</button>" +
+      '<h1 id="main-heading">Good to see you, ' +
+      esc((currentAccount().name || "").split(" ")[0]) +
+      ".</h1>" +
+      '<p class="lede">A calm view of the curriculum, drafts, and the work learners have shared.</p>' +
       "</div>" +
-      "</div>" +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>Import</h2></div>' +
-      '<label class="field"><span>Choose a JSON file</span>' +
-      '<input type="file" accept="application/json,.json" id="import-file"></label>' +
-      '<p class="hint">You will see a preview before anything is replaced. A safety copy is downloaded first.</p>' +
-      "</div>"
-    );
-  }
-
-  /* ==================== STUDENT VIEWS ==================== */
-  const STUDENT_NAV = [
-    { path: "student", label: "Roadmap", icon: "home" },
-    { path: "student/playground", label: "Playground", icon: "code" },
-    { path: "student/terminal", label: "Terminal", icon: "terminal" },
-    { path: "student/timer", label: "Timer", icon: "clock" },
-    { path: "student/data", label: "Data", icon: "data" },
-  ];
-
-  function renderStudentShell(sub, id) {
-    const active = sub === "lesson" ? "student" : "student/" + (sub || "");
-    let content = "";
-    if (sub === "lesson" && id) content = studentLesson(id);
-    else if (sub === "playground") content = studentPlayground();
-    else if (sub === "terminal") content = studentTerminal();
-    else if (sub === "timer") content = studentTimer();
-    else if (sub === "data") content = studentData();
-    else content = studentRoadmap();
-    return shell(STUDENT_NAV, active, content);
-  }
-
-  function continueTarget(accountId) {
-    const list = publishedModules();
-    return (
-      list.find((m) => readRecord(accountId, m).status === "in-progress") ||
-      list.find((m) => readRecord(accountId, m).status === "not-started") ||
-      list[0] ||
-      null
-    );
-  }
-  function computeBadges(accountId) {
-    const b = bucket(accountId);
-    const done = completedCount(accountId);
-    const earned = [];
-    if (done >= 1) earned.push("first-step");
-    if (done >= 2) earned.push("halfway");
-    if (done >= 4) earned.push("arrival");
-    if (b.quizAttempts.length >= 1) earned.push("quiz-taker");
-    if (b.challengeResults.some((c) => c.passed)) earned.push("builder");
-    if (b.feedback.length >= 1) earned.push("your-voice");
-    let changed = false;
-    earned.forEach((id) => {
-      if (!b.badges.includes(id)) {
-        b.badges.push(id);
-        changed = true;
-      }
-    });
-    if (changed) save();
-    return b.badges;
-  }
-
-  function studentRoadmap() {
-    const accId = myId();
-    const list = publishedModules();
-    const target = continueTarget(accId);
-    const earned = computeBadges(accId);
-    const doneCount = completedCount(accId);
-    const remainingMin = list
-      .filter((m) => readRecord(accId, m).status !== "completed")
-      .reduce((s, m) => s + (m.estimatedMinutes || 0), 0);
-    const pct = list.length ? Math.round((doneCount / list.length) * 100) : 0;
-    const account = currentAccount();
-    const greet = (() => {
-      const h = new Date().getHours();
-      if (h < 12) return "Good morning";
-      if (h < 18) return "Good afternoon";
-      return "Good evening";
-    })();
-
-    const tints = [
-      "tint-violet",
-      "tint-teal",
-      "tint-pink",
-      "tint-amber",
-      "tint-lime",
-    ];
-    const cards = list
-      .map((m, i) => {
-        const rec = readRecord(accId, m);
-        const status = rec.status;
-        const tint = tints[i % tints.length];
-        const icon = ["🌍", "🎨", "⚡", "🚀"][i % 4];
-        return (
-          '<article class="course-card">' +
-          '<div class="cover ' +
-          tint +
-          '">' +
-          '<span class="tag">Module ' +
-          (i + 1) +
-          "</span>" +
-          '<span class="icon">' +
-          icon +
-          "</span>" +
-          '<span class="status-pill ' +
-          (status === "completed"
-            ? "done"
-            : status === "in-progress"
-              ? "progress"
-              : "") +
-          '" style="position:absolute;left:1rem;bottom:.8rem">' +
-          (status === "completed"
-            ? "✓ Done"
-            : status === "in-progress"
-              ? "In progress"
-              : "Not started") +
-          "</span>" +
-          "</div>" +
-          '<div class="body">' +
-          "<h3>" +
-          esc(m.title) +
-          "</h3>" +
-          '<div class="desc">' +
-          esc(m.goal) +
-          "</div>" +
-          '<div class="bar"><span style="width:' +
-          (status === "completed" ? 100 : status === "in-progress" ? 50 : 0) +
-          '%"></span></div>' +
-          '<div class="foot">' +
-          "<span>⏱ " +
-          esc(m.estimatedMinutes) +
-          " min</span>" +
-          '<a class="btn-link" href="#student/lesson/' +
-          esc(m.id) +
-          '">' +
-          (status === "completed"
-            ? "Revisit"
-            : status === "in-progress"
-              ? "Continue"
-              : "Start") +
-          ICONS.arrowR +
-          "</a>" +
-          "</div>" +
-          "</div>" +
-          "</article>"
-        );
-      })
-      .join("");
-
-    const streak = bucket(accId).studySessions.length;
-    const weekDots = ["S", "M", "T", "W", "T", "F", "S"]
-      .map(
-        (d, i) =>
-          '<span class="' +
-          (i < Math.min(7, streak) ? "on" : "") +
-          '">' +
-          d +
-          "</span>",
-      )
-      .join("");
-
-    const badgeMini = BADGES.map(
-      (b) =>
-        '<div class="mini-badge ' +
-        (earned.includes(b.id) ? "earned" : "") +
-        '" title="' +
-        esc(b.label) +
-        '">' +
-        (earned.includes(b.id) ? "⭐" : "☆") +
-        "</div>",
-    ).join("");
-
-    const poll = state.curriculum.polls[0];
-    const answered = poll
-      ? bucket(accId).pollResponses.find((r) => r.pollId === poll.id)
-      : null;
-
-    const pollBlock = poll
-      ? '<div class="panel" style="margin-top:1.4rem">' +
-        '<div class="panel-head"><h2>' +
-        esc(poll.title) +
-        "</h2></div>" +
-        '<p style="color:var(--ink-soft);margin-bottom:.8rem">' +
-        esc(poll.question) +
-        "</p>" +
-        (answered
-          ? '<div class="quiz-result good">Your answer: <strong>' +
-            esc(poll.options[answered.optionIndex]) +
-            "</strong></div>"
-          : '<form data-form="poll-answer" data-poll="' +
-            esc(poll.id) +
-            '">' +
-            poll.options
-              .map(
-                (opt, i) =>
-                  '<label class="opt" style="display:flex;gap:.5rem;padding:.5rem;cursor:pointer"><input type="radio" name="option" value="' +
-                  i +
-                  '" required style="accent-color:var(--violet)"><span>' +
-                  esc(opt) +
-                  "</span></label>",
-              )
-              .join("") +
-            '<div style="margin-top:.7rem"><button class="btn primary sm" type="submit">Send answer</button></div>' +
-            "</form>") +
-        "</div>"
-      : "";
-
-    return (
-      '<div class="greeting">' +
-      '<h1 id="main-heading">' +
-      greet +
-      ", " +
-      esc(account.name.split(" ")[0]) +
-      ' <span class="wave">👋</span></h1>' +
-      "<p>You're " +
-      pct +
-      "% closer to completing the Journey to Mars project.</p>" +
-      "</div>" +
-      '<div class="stats-row">' +
-      '<div class="stat"><div class="ico violet">' +
-      ICONS.book +
-      '</div><div><div class="num">' +
-      doneCount +
-      "/" +
-      list.length +
-      '</div><div class="lbl">Modules done</div></div></div>' +
-      '<div class="stat"><div class="ico teal">' +
-      ICONS.star +
-      '</div><div><div class="num">' +
-      earned.length +
-      '</div><div class="lbl">Badges earned</div></div></div>' +
-      '<div class="stat"><div class="ico pink">' +
-      ICONS.clock +
-      '</div><div><div class="num">' +
-      Math.round(remainingMin) +
-      '</div><div class="lbl">Minutes left</div></div></div>' +
-      '<div class="stat"><div class="ico amber">' +
-      ICONS.rocket +
-      '</div><div><div class="num">' +
-      bucket(accId).quizAttempts.length +
-      '</div><div class="lbl">Quiz attempts</div></div></div>' +
-      "</div>" +
-      '<div class="hero-grid">' +
-      '<div class="hero">' +
-      '<span class="tag">' +
-      ICONS.rocket +
-      " Continue learning</span>" +
-      "<h2>" +
-      (target ? esc(target.title) : "Your roadmap is complete") +
-      "</h2>" +
-      "<p>" +
-      (target
-        ? esc(target.goal)
-        : "Every module is done. Revisit any lesson whenever you like.") +
-      "</p>" +
-      (target
-        ? '<div class="progress-line"><span style="width:' +
-          pct +
-          '%"></span></div>' +
-          '<a class="hero-cta" href="#student/lesson/' +
-          esc(target.id) +
-          '">' +
-          (doneCount === 0
-            ? "Start first module"
-            : "Pick up where you left off") +
-          ICONS.arrowR +
-          "</a>"
+      '<div class="home-grid">' +
+      '<div class="home-main">' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Curriculum at a glance</h2><a class="hint" href="#teacher/curriculum">Open curriculum →</a></div>' +
+      '<ul class="focus-list">' +
+      '<li><span class="mark done" aria-hidden="true">✓</span><div class="body"><strong>' +
+      published +
+      "</strong> published modules</div></li>" +
+      '<li><span class="mark" aria-hidden="true"></span><div class="body"><strong>' +
+      drafts +
+      "</strong> drafts waiting for review</div></li>" +
+      '<li><span class="mark" aria-hidden="true"></span><div class="body"><strong>' +
+      state.curriculum.resources.length +
+      "</strong> resources in the library</div></li>" +
+      '<li><span class="mark" aria-hidden="true"></span><div class="body"><strong>' +
+      state.curriculum.quizzes.length +
+      "</strong> quizzes · <strong>" +
+      state.curriculum.challenges.length +
+      "</strong> challenges</div></li>" +
+      "</ul>" +
+      "</section>" +
+      (pendingDrafts.length
+        ? '<section class="section">' +
+          '<div class="section-head"><h2>Drafts to review</h2><a class="hint" href="#teacher/curriculum">Manage</a></div>' +
+          '<ul class="questions">' +
+          pendingDrafts
+            .map(
+              (m) =>
+                "<li><strong>" +
+                esc(m.title) +
+                '</strong> · <span class="hint">' +
+                esc(m.estimatedMinutes) +
+                " min</span></li>",
+            )
+            .join("") +
+          "</ul>" +
+          "</section>"
         : "") +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Recent learner feedback</h2><a class="hint" href="#teacher/students">Learner work →</a></div>' +
+      (recentFeedback.length
+        ? '<table class="table"><thead><tr><th>Learner</th><th>Module</th><th>Signal</th><th>Note</th><th>When</th></tr></thead><tbody>' +
+          recentFeedback
+            .slice(0, 6)
+            .map(
+              (f) =>
+                "<tr><td>" +
+                esc(f.label) +
+                "</td><td>" +
+                esc(f.moduleId) +
+                "</td><td>" +
+                esc(f.sentiment) +
+                "</td><td>" +
+                esc(f.note || "—") +
+                '</td><td class="num">' +
+                esc(fmtDate(f.at)) +
+                "</td></tr>",
+            )
+            .join("") +
+          "</tbody></table>"
+        : '<p class="notes-empty">No feedback yet. When a learner sends a note it will appear here.</p>') +
+      "</section>" +
       "</div>" +
-      '<div class="hero-side">' +
-      "<h3>This week</h3>" +
-      '<div class="streak-card">' +
-      '<div class="big">' +
-      streak +
+      '<aside class="home-side">' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Learners</h2></div>' +
+      '<table class="table"><thead><tr><th>Name</th><th>Lessons</th><th>Quizzes</th></tr></thead><tbody>' +
+      students
+        .map((acc) => {
+          const b = bucket(acc.id);
+          return (
+            "<tr><td>" +
+            esc(acc.name) +
+            '</td><td class="num">' +
+            completedCount(acc.id) +
+            "/" +
+            publishedModules().length +
+            '</td><td class="num">' +
+            b.quizAttempts.length +
+            "</td></tr>"
+          );
+        })
+        .join("") +
+      "</tbody></table>" +
+      '<p class="hint" style="margin-top:0.5rem">Progress shown is only from this browser. Import a progress file to see other devices.</p>' +
+      "</section>" +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Share</h2></div>' +
+      '<p class="hint" style="margin-bottom:0.6rem">Data stays in this browser. Use files to move updates between devices.</p>' +
+      '<div style="display:flex;flex-direction:column;gap:.4rem">' +
+      '<a class="btn sm" href="#teacher/data">Open data &amp; sharing</a>' +
       "</div>" +
-      '<div class="meta"><strong>Study sessions</strong>recorded locally · gentle pace</div>' +
-      "</div>" +
-      "<div>" +
-      '<div style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Badges</div>' +
-      '<div class="mini-badges">' +
-      badgeMini +
-      "</div>" +
-      "</div>" +
-      "</div>" +
-      "</div>" +
-      '<div class="section-head">' +
-      "<h2>Your modules</h2>" +
-      '<a class="see-all" href="#student">See all ' +
-      ICONS.arrowR +
-      "</a>" +
-      "</div>" +
-      (list.length
-        ? '<div class="course-grid">' + cards + "</div>"
-        : '<div class="empty"><div class="em">🛰</div><p>No published modules yet. Your teacher will publish one soon.</p></div>') +
-      pollBlock
+      "</section>" +
+      "</aside>" +
+      "</div>"
     );
   }
+
+  /* =========================================================================
+     The functions below are preserved from the previous build so existing
+     routes (lesson detail, playground, terminal, timer, data, quiz editor,
+     module editor, resource editor, import/export) keep working with the
+     stored data. Phase 2 will re-lay-out each view.
+     ========================================================================= */
 
   function studentLesson(moduleId) {
     const m = findModule(moduleId);
     if (!m || !m.published)
-      return '<div class="empty"><div class="em">🛰</div><p>This lesson is not available. <a href="#student">Back to the roadmap</a>.</p></div>';
-
+      return '<div class="empty">This lesson is not available. <a href="#student/lessons">Back to lessons</a>.</div>';
     const accId = myId();
     const rec = readRecord(accId, m);
     if (rec.status === "not-started") {
@@ -1240,23 +1016,15 @@
       ? resources
           .map(
             (r) =>
-              '<div class="resource-card">' +
-              '<div class="ico">' +
-              (r.type === "link"
-                ? ICONS.arrowR
-                : r.type === "snippet"
-                  ? ICONS.code
-                  : ICONS.edit) +
-              "</div>" +
-              '<div class="meta">' +
-              '<div class="r-title">' +
+              '<div style="padding:.6rem 0;border-bottom:1px solid var(--rule)">' +
+              '<div style="font-weight:500">' +
               esc(r.title) +
               (r.needsVerification
-                ? ' <span class="chip warn">Unverified</span>'
+                ? ' <span class="chip warn">needs verification</span>'
                 : "") +
               "</div>" +
               (r.description
-                ? '<div class="r-desc">' + esc(r.description) + "</div>"
+                ? '<div class="hint">' + esc(r.description) + "</div>"
                 : "") +
               (r.url
                 ? '<div style="margin-top:.3rem"><a href="' +
@@ -1268,25 +1036,21 @@
               (r.body
                 ? r.type === "snippet"
                   ? "<pre>" + esc(r.body) + "</pre>"
-                  : '<p class="r-desc" style="margin-top:.4rem">' +
-                    esc(r.body) +
-                    "</p>"
+                  : '<p style="margin-top:.3rem">' + esc(r.body) + "</p>"
                 : "") +
-              "</div>" +
               "</div>",
           )
           .join("")
-      : '<p class="muted" style="font-size:.88rem">No resources attached yet.</p>';
+      : '<p class="hint">No resources attached yet.</p>';
 
     const sessionsHtml = (m.sessions || [])
       .map(
         (s, i) =>
-          '<li><span class="left"><span class="num">' +
+          "<li><span>" +
           (i + 1) +
-          "</span>" +
+          ". " +
           esc(s.title) +
-          "</span>" +
-          '<span class="mins">' +
+          '</span><span class="hint">' +
           s.minutes +
           " min</span></li>",
       )
@@ -1295,76 +1059,65 @@
     const checkHtml = (m.checklist || [])
       .map(
         (item, i) =>
-          '<label class="checklist-item ' +
-          (rec.checklist && rec.checklist[i] ? "checked" : "") +
-          '">' +
-          '<input type="checkbox" data-action="toggle-checklist" data-module="' +
+          '<label class="check"><input type="checkbox" data-action="toggle-checklist" data-module="' +
           esc(m.id) +
           '" data-index="' +
           i +
           '"' +
           (rec.checklist && rec.checklist[i] ? " checked" : "") +
-          ">" +
-          "<span>" +
+          "><span>" +
           esc(item) +
-          "</span>" +
-          "</label>",
+          "</span></label>",
       )
       .join("");
 
     return (
-      '<div class="lesson-header">' +
-      '<div class="crumb"><a href="#student">Roadmap</a> / Module ' +
+      '<div class="page-head">' +
+      '<div class="eyebrow"><a href="#student/lessons">← Lessons</a> · Module ' +
       esc(m.order) +
       "</div>" +
       '<h1 id="main-heading">' +
       esc(m.title) +
       "</h1>" +
-      '<p class="goal">' +
+      '<p class="lede">' +
       esc(m.goal) +
       "</p>" +
-      '<div class="lesson-meta">' +
-      '<span class="chip">⏱ ' +
+      '<p class="hint">' +
       esc(m.estimatedMinutes) +
-      " min</span>" +
-      '<span class="chip">' +
+      " min · " +
       (m.sessions || []).length +
-      " sessions</span>" +
-      '<span class="chip ' +
-      (rec.status === "completed" ? "done" : "prog") +
-      '">' +
-      (rec.status === "completed" ? "Completed" : "In progress") +
-      "</span>" +
+      " sessions · " +
+      esc(statusLabel(rec.status)) +
+      "</p>" +
       "</div>" +
-      "</div>" +
-      '<div class="lesson-grid">' +
+      '<div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:2.5rem;align-items:start" class="lesson-2col">' +
       "<div>" +
-      '<section class="lesson-step">' +
-      '<div class="step-head"><span class="step-num">1</span><h2>What you\'ll learn</h2></div>' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Understand</h2></div>' +
       paragraphs(m.explanation) +
       "</section>" +
-      '<section class="lesson-step">' +
-      '<div class="step-head"><span class="step-num">2</span><h2>Resources</h2></div>' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Resources</h2></div>' +
       resourcesHtml +
       "</section>" +
-      '<section class="lesson-step">' +
-      '<div class="step-head"><span class="step-num">3</span><h2>Practice</h2></div>' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Try</h2></div>' +
       "<p>" +
       esc(m.practice) +
       "</p>" +
-      "</section>" +
       (challenge
-        ? '<section class="lesson-step"><div class="step-head"><span class="step-num">4</span><h2>Challenge</h2></div>' +
+        ? '<div style="margin-top:1rem">' +
           challengeBlock(challenge, m) +
-          "</section>"
+          "</div>"
         : "") +
+      "</section>" +
       (quiz
-        ? '<section class="lesson-step"><div class="step-head"><span class="step-num">5</span><h2>Quiz</h2></div>' +
+        ? '<section class="section"><div class="section-head"><h2>Check</h2></div>' +
           quizBlock(quiz, m) +
           "</section>"
         : "") +
-      '<section class="lesson-step">' +
-      '<div class="step-head"><span class="step-num">6</span><h2>Reflection</h2></div>' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Reflect</h2></div>' +
       "<p>" +
       esc(m.reflection) +
       "</p>" +
@@ -1373,13 +1126,14 @@
       esc(m.id) +
       '" rows="3">' +
       esc((bucket(accId).drafts["reflection_" + m.id] || {}).text || "") +
-      "</textarea></label>" +
+      "</textarea>" +
+      "</label>" +
       "</section>" +
-      '<section class="lesson-step">' +
-      '<div class="step-head"><span class="step-num">7</span><h2>How was this lesson?</h2></div>' +
-      '<p style="font-size:.88rem">Optional. Never graded.</p>' +
-      '<div class="feedback-row">' +
-      ["Clear", "Need an example", "Need help"]
+      '<section class="section">' +
+      '<div class="section-head"><h2>How was this lesson?</h2></div>' +
+      '<p class="hint">Optional. Never graded.</p>' +
+      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">' +
+      ["Clear", "Need an example", "I'm stuck"]
         .map(
           (s) =>
             '<button type="button" class="btn sm" data-action="send-feedback" data-module="' +
@@ -1392,31 +1146,32 @@
         )
         .join("") +
       "</div>" +
-      '<label class="field" style="margin-top:.8rem"><span>Add a note (optional)</span>' +
+      '<label class="field" style="margin-top:.9rem"><span>Add a note (optional)</span>' +
       '<input type="text" id="fb-note-' +
       esc(m.id) +
       '" placeholder="One sentence is plenty"></label>' +
       "</section>" +
       "</div>" +
       "<aside>" +
-      '<div class="side-card">' +
-      "<h3>Completion checklist</h3>" +
-      (checkHtml || '<p class="muted small">No checklist items.</p>') +
-      '<div style="border-top:1px solid var(--line);margin:.7rem 0"></div>' +
-      '<button type="button" class="btn primary block" data-action="complete-module" data-id="' +
+      '<section class="section">' +
+      '<h3 style="margin-bottom:.5rem">Completion checklist</h3>' +
+      (checkHtml || '<p class="hint">No checklist items.</p>') +
+      '<button type="button" class="btn primary block" style="margin-top:.9rem" data-action="complete-module" data-id="' +
       esc(m.id) +
       '"' +
       (rec.status === "completed" ? " disabled" : "") +
       ">" +
-      (rec.status === "completed" ? "✓ Completed" : "Mark complete") +
+      (rec.status === "completed" ? "✓ Marked complete" : "Mark complete") +
       "</button>" +
-      "</div>" +
-      '<div class="side-card">' +
-      "<h3>Sessions</h3>" +
+      "</section>" +
+      '<section class="section">' +
+      '<h3 style="margin-bottom:.5rem">Sessions</h3>' +
       (sessionsHtml
-        ? '<ul class="session-list">' + sessionsHtml + "</ul>"
-        : '<p class="muted small">No sessions listed.</p>') +
-      "</div>" +
+        ? '<ul style="list-style:none;padding:0;margin:0;font-size:.88rem">' +
+          sessionsHtml +
+          "</ul>"
+        : '<p class="hint">No sessions listed.</p>') +
+      "</section>" +
       "</aside>" +
       "</div>"
     );
@@ -1438,11 +1193,11 @@
     const checklistHtml =
       challenge.checkType === "checklist"
         ? '<div style="margin-top:.8rem">' +
-          '<p style="font-size:.82rem;color:var(--muted);margin-bottom:.4rem">Tick each item honestly. This confirms self-check, not perfect code.</p>' +
+          '<p class="hint" style="margin-bottom:.4rem">Tick each item honestly. This confirms a self-check, not perfect code.</p>' +
           (challenge.checklist || [])
             .map(
               (item, i) =>
-                '<label class="checklist-item"><input type="checkbox" data-action="toggle-challenge-check" data-challenge="' +
+                '<label class="check"><input type="checkbox" data-action="toggle-challenge-check" data-challenge="' +
                 esc(challenge.id) +
                 '" data-module="' +
                 esc(module.id) +
@@ -1463,31 +1218,27 @@
       esc(challenge.instructions) +
       "</p>" +
       ((challenge.hints || []).length
-        ? '<details style="margin:.6rem 0"><summary style="cursor:pointer;font-size:.85rem;color:var(--violet);font-weight:700">Show hints</summary><ul style="font-size:.85rem;color:var(--ink-soft);margin-top:.4rem">' +
+        ? '<details style="margin:.6rem 0"><summary class="hint" style="cursor:pointer">Show hints</summary><ul style="font-size:.88rem;margin-top:.4rem">' +
           challenge.hints.map((h) => "<li>" + esc(h) + "</li>").join("") +
           "</ul></details>"
         : "") +
-      '<div class="pg-note" style="margin:.9rem 0">' +
-      ICONS.warn +
-      "<span>Run only code you trust. The preview is sandboxed but is not a hardened environment for arbitrary untrusted programs.</span></div>" +
+      '<p class="hint" style="margin:.9rem 0;padding:.7rem .9rem;border:1px solid var(--rule);border-radius:var(--radius);background:var(--warn-bg);color:var(--warn-ink)">Run only code you trust. The preview is sandboxed, but it is not a hardened environment for arbitrary untrusted programs.</p>' +
       playgroundHtml(module.id, draft) +
-      '<div class="row" style="margin-top:.9rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">' +
+      '<div style="margin-top:.9rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">' +
       '<button type="button" class="btn primary sm" data-action="check-challenge" data-challenge="' +
       esc(challenge.id) +
       '" data-module="' +
       esc(module.id) +
       '">Check my work</button>' +
       (last
-        ? '<span class="chip ' +
-          (last.passed ? "done" : "warn") +
-          '">' +
-          (last.passed ? "✓ Passed" : "Not passed") +
+        ? '<span class="hint">' +
+          (last.passed ? "Passed" : "Not passed") +
           " · " +
           esc(fmtDate(last.at)) +
           "</span>"
         : "") +
       "</div>" +
-      '<p style="margin-top:.6rem;font-size:.82rem;color:var(--muted)"><strong>Sample:</strong> ' +
+      '<p class="hint" style="margin-top:.6rem">Sample: ' +
       esc(challenge.sampleResult || "—") +
       "</p>" +
       checklistHtml
@@ -1499,93 +1250,85 @@
     const attempts = b.quizAttempts.filter((a) => a.quizId === quiz.id);
     const last = attempts[attempts.length - 1];
 
-    const qs = quiz.questions
-      .map(
-        (q, qi) =>
-          '<div class="quiz-q">' +
-          '<div class="qp">' +
-          (qi + 1) +
-          ". " +
-          esc(q.prompt) +
-          "</div>" +
-          q.options
-            .map(
-              (opt, oi) =>
-                '<label class="opt"><input type="radio" name="q_' +
-                esc(q.id) +
-                '" value="' +
-                oi +
-                '" required><span>' +
-                esc(opt) +
-                "</span></label>",
-            )
-            .join("") +
-          "</div>",
-      )
-      .join("");
-
     return (
       '<form data-form="quiz-answer" data-quiz="' +
       esc(quiz.id) +
       '" data-module="' +
       esc(module.id) +
       '">' +
-      qs +
+      quiz.questions
+        .map(
+          (q, qi) =>
+            '<div style="padding:1rem 0;border-bottom:1px solid var(--rule)">' +
+            '<p style="font-weight:500;margin-bottom:.5rem">' +
+            (qi + 1) +
+            ". " +
+            esc(q.prompt) +
+            "</p>" +
+            q.options
+              .map(
+                (opt, oi) =>
+                  '<label class="check"><input type="radio" name="q_' +
+                  esc(q.id) +
+                  '" value="' +
+                  oi +
+                  '" required><span>' +
+                  esc(opt) +
+                  "</span></label>",
+              )
+              .join("") +
+            "</div>",
+        )
+        .join("") +
       '<div style="margin-top:1rem"><button class="btn primary sm" type="submit">Check answers</button></div>' +
       "</form>" +
       (last
-        ? '<div class="quiz-result ' +
-          (last.score === last.total ? "good" : "mixed") +
-          '">' +
+        ? '<div style="margin-top:1rem;padding:.8rem 1rem;border:1px solid var(--rule);border-radius:var(--radius);background:var(--surface)">' +
           "Last attempt: <strong>" +
           last.score +
           " / " +
           last.total +
           "</strong> · " +
           esc(fmtDate(last.at)) +
-          '<div style="font-size:.8rem;opacity:.8;margin-top:.2rem">Retries are unlimited and never penalised.</div>' +
+          '<div class="hint" style="margin-top:.2rem">Retries are unlimited and never penalised.</div>' +
           "</div>"
         : "")
     );
   }
 
-  /* ---- Playground ---- */
   function playgroundHtml(scope, draft) {
     return (
-      '<div class="playground" data-scope="' +
+      '<div data-scope="' +
       esc(scope) +
       '">' +
-      '<div class="pg-code"><span class="hint" style="display:block;margin-bottom:.3rem;font-family:var(--mono);font-weight:700">HTML</span>' +
-      '<textarea data-code="html" aria-label="HTML">' +
+      '<div class="field"><span>HTML</span><textarea data-code="html" aria-label="HTML" style="font-family:var(--font-mono);min-height:100px">' +
       esc(draft.html) +
       "</textarea></div>" +
-      '<div class="pg-code"><span class="hint" style="display:block;margin-bottom:.3rem;font-family:var(--mono);font-weight:700">CSS</span>' +
-      '<textarea data-code="css" aria-label="CSS">' +
+      '<div class="field"><span>CSS</span><textarea data-code="css" aria-label="CSS" style="font-family:var(--font-mono);min-height:90px">' +
       esc(draft.css) +
       "</textarea></div>" +
-      '<div class="pg-code"><span class="hint" style="display:block;margin-bottom:.3rem;font-family:var(--mono);font-weight:700">JavaScript</span>' +
-      '<textarea data-code="js" aria-label="JavaScript">' +
+      '<div class="field"><span>JavaScript</span><textarea data-code="js" aria-label="JavaScript" style="font-family:var(--font-mono);min-height:110px">' +
       esc(draft.js) +
       "</textarea></div>" +
-      '<div class="pg-actions">' +
+      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem">' +
       '<button class="btn primary sm" type="button" data-action="run-code" data-scope="' +
       esc(scope) +
-      '">' +
-      ICONS.play +
-      " Run</button>" +
+      '">Run</button>' +
       '<button class="btn sm" type="button" data-action="reset-code" data-scope="' +
       esc(scope) +
       '">Reset</button>' +
-      '<button class="btn sm ghost" type="button" data-action="save-draft" data-scope="' +
+      '<button class="btn sm" type="button" data-action="save-draft" data-scope="' +
       esc(scope) +
       '">Save draft</button>' +
       "</div>" +
-      '<div class="pg-preview"><iframe data-sandbox="' +
+      '<div style="border:1px solid var(--rule);border-radius:var(--radius-sm);overflow:hidden;margin-top:.7rem;background:#fff">' +
+      '<iframe data-sandbox="' +
       esc(scope) +
-      '" title="Preview" sandbox="allow-scripts"></iframe></div>' +
+      '" title="Preview" sandbox="allow-scripts" style="width:100%;height:220px;border:0;display:block"></iframe>' +
+      "</div>" +
       '<pre class="pg-out" data-output="' +
       esc(scope) +
-      '" aria-live="polite">Console output appears here after you click Run.</pre>' +
+      '" aria-live="polite" style="margin-top:.6rem;min-height:60px">Console output appears here after you click Run.</pre>' +
       "</div>"
     );
   }
@@ -1597,31 +1340,29 @@
       js: "const facts = ['Olympus Mons is the tallest volcano in the solar system.', 'A Mars day lasts 24 hours 37 minutes.'];\nconst out = document.querySelector('#fact');\ndocument.querySelector('#next').addEventListener('click', () => {\n  out.textContent = facts[Math.floor(Math.random() * facts.length)];\n});",
     };
     return (
-      '<div class="greeting"><h1 id="main-heading">Playground</h1><p>A safe space to try HTML, CSS and JavaScript. Drafts stay in this browser.</p></div>' +
-      '<div class="pg-note" style="margin-bottom:1rem">' +
-      ICONS.warn +
-      "<span>Run only code you trust. The preview is sandboxed but not a hardened environment for arbitrary untrusted programs.</span></div>" +
-      '<div class="panel">' +
+      '<div class="page-head"><div class="eyebrow">Playground</div><h1 id="main-heading">Try some code</h1>' +
+      '<p class="lede">A small sandbox for HTML, CSS, and JavaScript. Drafts are saved in this browser.</p></div>' +
+      '<p class="hint" style="margin-bottom:1rem;padding:.7rem .9rem;border:1px solid var(--rule);border-radius:var(--radius);background:var(--warn-bg);color:var(--warn-ink)">Run only code you trust. The preview is sandboxed but not a hardened environment for arbitrary untrusted programs.</p>' +
+      '<div class="card">' +
       playgroundHtml("__sandbox__", draft) +
       "</div>"
     );
   }
 
-  /* ---- Terminal ---- */
   function studentTerminal() {
     const jsLen = (bucket(myId()).drafts["__sandbox__"] || {}).js?.length || 0;
     return (
-      '<div class="greeting"><h1 id="main-heading">Terminal</h1><p>A fixed set of simulated commands. No operating-system commands are ever executed.</p></div>' +
-      '<div class="term" style="margin-bottom:1rem">' +
-      '<div class="term-out" id="term-out"><span class="prompt">orbit:~$</span> Type <span class="cmd">help</span> to see commands.\n</div>' +
-      '<form class="term-in" data-form="terminal">' +
-      "<span>orbit:~$</span>" +
-      '<input type="text" name="cmd" id="term-input" autocomplete="off" spellcheck="false" aria-label="Command" placeholder="help">' +
+      '<div class="page-head"><div class="eyebrow">Terminal</div><h1 id="main-heading">Terminal simulator</h1>' +
+      '<p class="lede">A fixed set of simulated commands. No operating-system commands are executed.</p></div>' +
+      '<div class="term" style="background:#1c1f1c;border-radius:var(--radius);border:1px solid var(--rule);overflow:hidden;font-family:var(--font-mono);font-size:.88rem">' +
+      '<div id="term-out" style="padding:1rem 1.2rem;height:320px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#c8d3c5;line-height:1.6"><span style="color:#b2c8a5">orbit:~$</span> Type <span style="color:#e5ab91">help</span> to see commands.\n</div>' +
+      '<form data-form="terminal" style="display:flex;align-items:center;gap:.6rem;border-top:1px solid #333a34;padding:.7rem 1.2rem;background:#161916">' +
+      '<span style="color:#b2c8a5">orbit:~$</span>' +
+      '<input type="text" name="cmd" id="term-input" autocomplete="off" spellcheck="false" aria-label="Command" placeholder="help" style="flex:1;background:transparent;border:0;color:#e6ecff;outline:none;padding:.2rem 0;font-family:var(--font-mono);font-size:.88rem">' +
       "</form>" +
       "</div>" +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>Supported commands</h2></div>' +
-      '<ul style="font-size:.88rem;color:var(--ink-soft);padding-left:1.1rem;line-height:1.9">' +
+      '<div class="card" style="margin-top:1rem"><h3 style="margin-bottom:.5rem">Supported commands</h3>' +
+      '<ul style="font-size:.9rem;color:var(--ink-2)">' +
       "<li><code>help</code> — list commands</li>" +
       "<li><code>clear</code> — clear screen</li>" +
       "<li><code>lessons</code> — list modules</li>" +
@@ -1648,7 +1389,7 @@
   async function handleTerminalCommand(raw) {
     const cmd = String(raw || "").trim();
     if (!cmd) return;
-    termPrint("orbit:~$ " + cmd, "cmd");
+    termPrint("orbit:~$ " + cmd);
     if (cmd === "help") {
       termPrint(
         "Commands: help, clear, lessons, progress, run index.js, starmap",
@@ -1697,10 +1438,7 @@
     if (cmd === "run index.js") {
       const code = (bucket(myId()).drafts["__sandbox__"] || {}).js || "";
       if (!code.trim()) {
-        termPrint(
-          "index.js is empty. Save a draft in the Playground first.",
-          "err",
-        );
+        termPrint("index.js is empty. Save a draft in the Playground first.");
         return;
       }
       termPrint("  Running index.js in the sandboxed preview…");
@@ -1718,10 +1456,9 @@
       );
       return;
     }
-    termPrint("Unknown command: " + cmd + '. Type "help".', "err");
+    termPrint("Unknown command: " + cmd + '. Type "help".');
   }
 
-  /* ---- Timer ---- */
   function studentTimer() {
     const sessions = bucket(myId()).studySessions;
     const totalSec = sessions.reduce((s, x) => s + (x.seconds || 0), 0);
@@ -1731,48 +1468,55 @@
           .reverse()
           .map(
             (s) =>
-              "<li><span>" +
+              '<li style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .7rem;border:1px solid var(--rule);border-radius:var(--radius-sm);background:var(--surface)">' +
+              "<span>" +
               fmtDur(s.seconds) +
-              ' · <span style="color:var(--muted);font-size:.78rem">' +
+              ' <span class="hint">· ' +
               esc(fmtDate(s.at)) +
               "</span></span>" +
               '<button class="btn sm danger" type="button" data-action="delete-session" data-id="' +
               esc(s.id) +
-              '">Delete</button></li>',
+              '">Delete</button>' +
+              "</li>",
           )
           .join("")
       : "";
 
     return (
-      '<div class="greeting"><h1 id="main-heading">Study timer</h1><p>An estimate of time spent, not proof of attention. Nothing runs in the background.</p></div>' +
-      '<div class="timer-card" style="margin-bottom:1.4rem">' +
-      '<div class="timer-display" id="timer-display">' +
+      '<div class="page-head"><div class="eyebrow">Timer</div><h1 id="main-heading">Study timer</h1>' +
+      '<p class="lede">An estimate of time spent, not proof of attention. Nothing runs in the background.</p></div>' +
+      '<div class="card" style="padding:1.5rem;margin-bottom:1rem">' +
+      '<div id="timer-display" style="font-family:var(--font-mono);font-size:2.4rem;letter-spacing:.02em;margin-bottom:.4rem">' +
       fmtClock(timer.seconds) +
       "</div>" +
-      '<div class="timer-label">Focus session</div>' +
-      '<div class="timer-actions">' +
+      '<p class="hint" style="margin-bottom:1rem">Focus session</p>' +
+      '<div style="display:flex;gap:.5rem;flex-wrap:wrap">' +
       '<button class="btn primary" type="button" data-action="timer-start"' +
       (timer.running ? " disabled" : "") +
       ">Start</button>" +
       '<button class="btn" type="button" data-action="timer-pause"' +
       (timer.running ? "" : " disabled") +
       ">Pause</button>" +
-      '<button class="btn teal" type="button" data-action="timer-stop">Stop &amp; save</button>' +
+      '<button class="btn" type="button" data-action="timer-stop">Stop &amp; save</button>' +
       "</div>" +
-      '<label class="check" style="margin-top:1rem;justify-content:center">' +
+      '<label class="check" style="margin-top:.9rem">' +
       '<input type="checkbox" id="timer-record"' +
       (timer.record ? " checked" : "") +
       ">" +
-      "<span>Record and show to my teacher</span>" +
+      "<span>Record this session and show it to my teacher</span>" +
       "</label>" +
       "</div>" +
-      '<div class="panel">' +
-      '<div class="panel-head"><h2>Recorded sessions</h2><span class="chip">' +
+      '<div class="card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.7rem">' +
+      '<h3>Recorded sessions</h3><span class="hint">' +
       fmtDur(totalSec) +
-      " total</span></div>" +
+      " total</span>" +
+      "</div>" +
       (rows
-        ? '<ul class="session-list">' + rows + "</ul>"
-        : '<div class="empty"><div class="em">⏱</div><p>No sessions recorded yet.</p></div>') +
+        ? '<ul style="list-style:none;padding:0;margin:0;display:grid;gap:.4rem">' +
+          rows +
+          "</ul>"
+        : '<p class="notes-empty">No sessions recorded yet.</p>') +
       "</div>"
     );
   }
@@ -1817,11 +1561,7 @@
     render();
   }
 
-  function studentData() {
-    return dataView();
-  }
-
-  /* ==================== SANDBOX ==================== */
+  /* ---------- Sandbox ---------- */
   const SANDBOX_BOOT =
     "<scr" +
     "ipt>" +
@@ -1860,7 +1600,6 @@
       "</body></html>"
     );
   }
-
   window.addEventListener("message", (event) => {
     const data = event.data;
     if (!data || data.__orbit !== true || typeof data.type !== "string") return;
@@ -1871,7 +1610,6 @@
       }
     }
   });
-
   function runSandbox(iframe, parts, onEvent) {
     sandboxHandlers.set(iframe, onEvent);
     iframe.onload = () => {
@@ -1886,7 +1624,6 @@
     };
     iframe.srcdoc = buildDoc(parts.html, parts.css);
   }
-
   function runSandboxAsync(code) {
     return new Promise((resolve) => {
       const iframe = document.createElement("iframe");
@@ -1922,7 +1659,31 @@
     });
   }
 
-  /* ==================== EXPORT / IMPORT ==================== */
+  /* ---------- Data view (preserved; Phase 3 will restyle) ---------- */
+  function dataView() {
+    return (
+      '<div class="page-head"><div class="eyebrow">Share</div>' +
+      '<h1 id="main-heading">Data &amp; sharing</h1>' +
+      '<p class="lede">Data stays in this browser. Use files to share updates between devices.</p></div>' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Export</h2></div>' +
+      '<p class="hint" style="margin-bottom:.6rem">Curriculum and progress are separate so you never mix lesson content with learner progress.</p>' +
+      '<div style="display:flex;gap:.5rem;flex-wrap:wrap">' +
+      '<button class="btn" type="button" data-action="export-curriculum">Export curriculum</button>' +
+      '<button class="btn" type="button" data-action="export-progress">Export progress</button>' +
+      '<button class="btn" type="button" data-action="export-full">Full backup</button>' +
+      "</div>" +
+      "</section>" +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Import</h2></div>' +
+      '<p class="hint" style="margin-bottom:.6rem">You will see a preview and confirm before anything is replaced. A safety copy is downloaded first.</p>' +
+      '<label class="field"><span>Choose a JSON file</span>' +
+      '<input type="file" accept="application/json,.json" id="import-file"></label>' +
+      "</section>"
+    );
+  }
+
+  /* ---------- Export / import ---------- */
   function download(name, payload) {
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
@@ -1996,7 +1757,6 @@
       return "Missing state object.";
     return null;
   }
-
   function previewImport(d) {
     if (d.kind === "orbit-curriculum") {
       const mods = d.curriculum.modules || [];
@@ -2050,7 +1810,6 @@
       "</strong>. Will replace both curriculum and progress.</p>"
     );
   }
-
   function applyImport(d) {
     download("orbit-pre-import-backup-" + stamp() + ".json", {
       kind: "orbit-full",
@@ -2083,7 +1842,6 @@
     }
     render();
   }
-
   function handleImportFile(file) {
     const r = new FileReader();
     r.onload = () => {
@@ -2118,7 +1876,312 @@
     r.readAsText(file);
   }
 
-  /* ==================== FORMS ==================== */
+  /* ---------- Teacher curriculum (functional) ---------- */
+  function teacherCurriculum() {
+    const modules = state.curriculum.modules
+      .slice()
+      .sort((a, b) => a.order - b.order);
+    const rows = modules.length
+      ? modules
+          .map(
+            (m, i) =>
+              '<div class="module-row">' +
+              '<span class="order">' +
+              (i + 1) +
+              "</span>" +
+              "<div>" +
+              '<div class="title">' +
+              esc(m.title) +
+              ' <span class="hint" style="margin-left:.4rem">' +
+              '<span class="status-dot ' +
+              (m.published ? "pub" : "draft") +
+              '"></span>' +
+              (m.published ? "Published" : "Draft") +
+              " · v" +
+              m.version +
+              "</span></div>" +
+              '<div class="meta">' +
+              esc(m.estimatedMinutes) +
+              " min · " +
+              (m.sessions || []).length +
+              " sessions · " +
+              (m.checklist || []).length +
+              " checklist</div>" +
+              "</div>" +
+              '<div class="actions">' +
+              '<button class="btn sm" type="button" data-action="move-up" data-id="' +
+              esc(m.id) +
+              '"' +
+              (i === 0 ? " disabled" : "") +
+              ">↑</button>" +
+              '<button class="btn sm" type="button" data-action="move-down" data-id="' +
+              esc(m.id) +
+              '"' +
+              (i === modules.length - 1 ? " disabled" : "") +
+              ">↓</button>" +
+              '<button class="btn sm" type="button" data-action="toggle-publish" data-id="' +
+              esc(m.id) +
+              '">' +
+              (m.published ? "Unpublish" : "Publish") +
+              "</button>" +
+              '<button class="btn sm" type="button" data-action="edit-module" data-id="' +
+              esc(m.id) +
+              '">Edit</button>' +
+              '<button class="btn sm danger" type="button" data-action="delete-module" data-id="' +
+              esc(m.id) +
+              '">Delete</button>' +
+              "</div>" +
+              "</div>",
+          )
+          .join("")
+      : '<div class="empty-state"><strong>No modules yet.</strong>Add your first module to begin.</div>';
+
+    return (
+      '<div class="page-head"><div class="eyebrow">Teach</div><h1 id="main-heading">Curriculum</h1>' +
+      '<p class="lede">Order, publish, and edit the modules learners see.</p></div>' +
+      '<div class="section-head" style="display:flex;justify-content:flex-end;margin-bottom:.9rem">' +
+      '<button class="btn primary" type="button" data-action="add-module">New module</button>' +
+      "</div>" +
+      "<div>" +
+      rows +
+      "</div>"
+    );
+  }
+
+  function teacherResources() {
+    const rows = state.curriculum.resources
+      .map(
+        (r) =>
+          '<div class="module-row">' +
+          '<span class="order">' +
+          (r.type === "link" ? "↗" : r.type === "snippet" ? "{}" : "✎") +
+          "</span>" +
+          "<div>" +
+          '<div class="title">' +
+          esc(r.title) +
+          ' <span class="hint">· ' +
+          esc(r.type) +
+          (r.needsVerification ? " · needs verification" : "") +
+          "</span></div>" +
+          '<div class="meta">' +
+          (r.url ? esc(r.url) : "local note") +
+          "</div>" +
+          "</div>" +
+          '<div class="actions">' +
+          '<button class="btn sm" type="button" data-action="preview-resource" data-id="' +
+          esc(r.id) +
+          '">Preview</button>' +
+          '<button class="btn sm" type="button" data-action="edit-resource" data-id="' +
+          esc(r.id) +
+          '">Edit</button>' +
+          '<button class="btn sm danger" type="button" data-action="delete-resource" data-id="' +
+          esc(r.id) +
+          '">Delete</button>' +
+          "</div>" +
+          "</div>",
+      )
+      .join("");
+    return (
+      '<div class="page-head"><div class="eyebrow">Teach</div><h1 id="main-heading">Resources</h1>' +
+      '<p class="lede">Links, notes and code snippets that support each module.</p></div>' +
+      '<div class="section-head" style="display:flex;justify-content:flex-end;margin-bottom:.9rem">' +
+      '<button class="btn primary" type="button" data-action="add-resource">New resource</button></div>' +
+      (rows
+        ? "<div>" + rows + "</div>"
+        : '<div class="empty-state"><strong>No resources yet.</strong>Add your first one.</div>')
+    );
+  }
+
+  function teacherChallenges() {
+    const rows = state.curriculum.challenges
+      .map(
+        (c) =>
+          '<div class="module-row">' +
+          '<span class="order">⚑</span>' +
+          "<div>" +
+          '<div class="title">' +
+          esc(c.title) +
+          ' <span class="hint">· ' +
+          (c.checkType === "console" ? "Console match" : "Self-check") +
+          "</span></div>" +
+          '<div class="meta">' +
+          (c.checkType === "console"
+            ? "Expected: " + esc(c.expectedOutput || "—")
+            : (c.checklist || []).length + " checklist items") +
+          "</div>" +
+          "</div>" +
+          '<div class="actions">' +
+          '<button class="btn sm" type="button" data-action="edit-challenge" data-id="' +
+          esc(c.id) +
+          '">Edit</button>' +
+          '<button class="btn sm danger" type="button" data-action="delete-challenge" data-id="' +
+          esc(c.id) +
+          '">Delete</button>' +
+          "</div>" +
+          "</div>",
+      )
+      .join("");
+    return (
+      '<div class="page-head"><div class="eyebrow">Teach</div><h1 id="main-heading">Challenges</h1>' +
+      '<p class="lede">Practical exercises with clear checking methods.</p></div>' +
+      '<div class="section-head" style="display:flex;justify-content:flex-end;margin-bottom:.9rem">' +
+      '<button class="btn primary" type="button" data-action="add-challenge">New challenge</button></div>' +
+      (rows
+        ? "<div>" + rows + "</div>"
+        : '<div class="empty-state"><strong>No challenges yet.</strong>Add your first one.</div>')
+    );
+  }
+
+  function teacherQuizzes() {
+    const quizRows = state.curriculum.quizzes
+      .map(
+        (q) =>
+          '<div class="module-row">' +
+          '<span class="order">?</span>' +
+          '<div><div class="title">' +
+          esc(q.title) +
+          "</div>" +
+          '<div class="meta">' +
+          q.questions.length +
+          " questions</div></div>" +
+          '<div class="actions">' +
+          '<button class="btn sm" type="button" data-action="edit-quiz" data-id="' +
+          esc(q.id) +
+          '">Edit</button>' +
+          '<button class="btn sm danger" type="button" data-action="delete-quiz" data-id="' +
+          esc(q.id) +
+          '">Delete</button>' +
+          "</div>" +
+          "</div>",
+      )
+      .join("");
+    const pollRows = state.curriculum.polls
+      .map(
+        (p) =>
+          '<div class="module-row">' +
+          '<span class="order">◔</span>' +
+          '<div><div class="title">' +
+          esc(p.title) +
+          "</div>" +
+          '<div class="meta">' +
+          esc(p.question) +
+          "</div></div>" +
+          '<div class="actions">' +
+          '<button class="btn sm" type="button" data-action="edit-poll" data-id="' +
+          esc(p.id) +
+          '">Edit</button>' +
+          '<button class="btn sm danger" type="button" data-action="delete-poll" data-id="' +
+          esc(p.id) +
+          '">Delete</button>' +
+          "</div>" +
+          "</div>",
+      )
+      .join("");
+    return (
+      '<div class="page-head"><div class="eyebrow">Teach</div><h1 id="main-heading">Quizzes &amp; polls</h1>' +
+      '<p class="lede">Check understanding. Unlimited retries, no penalties.</p></div>' +
+      '<div class="section-head" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.5rem"><h2>Quizzes</h2>' +
+      '<button class="btn primary sm" type="button" data-action="add-quiz">New quiz</button></div>' +
+      (quizRows
+        ? '<div style="margin-bottom:1.5rem">' + quizRows + "</div>"
+        : '<p class="notes-empty">No quizzes yet.</p>') +
+      '<div class="section-head" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.5rem"><h2>Polls &amp; reflection</h2>' +
+      '<button class="btn primary sm" type="button" data-action="add-poll">New poll</button></div>' +
+      (pollRows
+        ? "<div>" + pollRows + "</div>"
+        : '<p class="notes-empty">No polls yet.</p>')
+    );
+  }
+
+  function teacherStudents() {
+    const students = ACCOUNTS.filter((a) => a.role === "student");
+    const rows = students
+      .map((acc) => {
+        const b = bucket(acc.id);
+        const done = completedCount(acc.id);
+        const mins =
+          b.studySessions.reduce((s, x) => s + (x.seconds || 0), 0) / 60;
+        return (
+          "<tr>" +
+          "<td>" +
+          esc(acc.name) +
+          "</td>" +
+          '<td class="num">' +
+          done +
+          " / " +
+          publishedModules().length +
+          "</td>" +
+          '<td class="num">' +
+          b.quizAttempts.length +
+          "</td>" +
+          '<td class="num">' +
+          b.challengeResults.filter((c) => c.passed).length +
+          "</td>" +
+          '<td class="num">' +
+          b.feedback.length +
+          "</td>" +
+          '<td class="num">' +
+          Math.round(mins) +
+          " min</td>" +
+          "</tr>"
+        );
+      })
+      .join("");
+
+    const allFeedback = [];
+    Object.keys(state.progress).forEach((accId) => {
+      const acc = ACCOUNTS.find((a) => a.id === accId);
+      const label = acc ? acc.name : accId === VISITOR.id ? "Visitor" : accId;
+      (state.progress[accId].feedback || []).forEach((f) => {
+        allFeedback.push({
+          label,
+          moduleId: f.moduleId,
+          sentiment: f.sentiment,
+          note: f.note,
+          at: f.at,
+        });
+      });
+    });
+    allFeedback.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const fbRows = allFeedback
+      .slice(0, 20)
+      .map(
+        (f) =>
+          "<tr><td>" +
+          esc(f.label) +
+          "</td><td>" +
+          esc(f.moduleId) +
+          "</td><td>" +
+          esc(f.sentiment) +
+          "</td><td>" +
+          esc(f.note || "—") +
+          '</td><td class="num">' +
+          esc(fmtDate(f.at)) +
+          "</td></tr>",
+      )
+      .join("");
+
+    return (
+      '<div class="page-head"><div class="eyebrow">Teach</div><h1 id="main-heading">Learner work</h1>' +
+      '<p class="lede">Progress from this browser only. Import a progress file to see other devices.</p></div>' +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Overview</h2></div>' +
+      '<table class="table"><thead><tr><th>Learner</th><th>Lessons</th><th>Quizzes</th><th>Challenges</th><th>Feedback</th><th>Study time</th></tr></thead><tbody>' +
+      rows +
+      "</tbody></table>" +
+      "</section>" +
+      '<section class="section">' +
+      '<div class="section-head"><h2>Recent feedback</h2></div>' +
+      (fbRows
+        ? '<table class="table"><thead><tr><th>Learner</th><th>Module</th><th>Signal</th><th>Note</th><th>When</th></tr></thead><tbody>' +
+          fbRows +
+          "</tbody></table>"
+        : '<p class="notes-empty">No feedback yet.</p>') +
+      "</section>"
+    );
+  }
+
+  /* ---------- Editors (module / resource / challenge / quiz / poll) ---------- */
   function moduleFormHtml(m) {
     const isNew = !m;
     const d = m || {
@@ -2222,7 +2285,7 @@
       "</fieldset>" +
       '<label class="check"><input type="checkbox" name="published"' +
       (d.published ? " checked" : "") +
-      "><span>Published (visible to students)</span></label>" +
+      "><span>Published (visible to learners)</span></label>" +
       '<div style="display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem">' +
       '<button type="button" class="btn ghost" data-action="modal-close">Cancel</button>' +
       '<button type="submit" class="btn primary">' +
@@ -2286,7 +2349,7 @@
       '<label class="field"><span>Description</span><textarea name="description" rows="2">' +
       esc(d.description) +
       "</textarea></label>" +
-      '<label class="field"><span>Body</span><textarea name="body" rows="6" style="font-family:var(--mono);font-size:.82rem">' +
+      '<label class="field"><span>Body</span><textarea name="body" rows="6" style="font-family:var(--font-mono);font-size:.82rem">' +
       esc(d.body) +
       "</textarea></label>" +
       '<label class="check"><input type="checkbox" name="needsVerification"' +
@@ -2294,7 +2357,7 @@
       "><span>Needs verification (link unvetted)</span></label>" +
       '<div style="display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem">' +
       '<button type="button" class="btn ghost" data-action="modal-close">Cancel</button>' +
-      '<button type="submit" class="btn primary">Publish to this browser</button>' +
+      '<button type="submit" class="btn primary">Save to this browser</button>' +
       "</div>" +
       "</form>"
     );
@@ -2324,13 +2387,13 @@
       esc(d.instructions) +
       "</textarea></label>" +
       "<fieldset><legend>Starter code</legend>" +
-      '<label class="field"><span>HTML</span><textarea name="starterHtml" rows="4" style="font-family:var(--mono);font-size:.82rem">' +
+      '<label class="field"><span>HTML</span><textarea name="starterHtml" rows="4" style="font-family:var(--font-mono);font-size:.82rem">' +
       esc(d.starterHtml) +
       "</textarea></label>" +
-      '<label class="field"><span>CSS</span><textarea name="starterCss" rows="3" style="font-family:var(--mono);font-size:.82rem">' +
+      '<label class="field"><span>CSS</span><textarea name="starterCss" rows="3" style="font-family:var(--font-mono);font-size:.82rem">' +
       esc(d.starterCss) +
       "</textarea></label>" +
-      '<label class="field"><span>JavaScript</span><textarea name="starterJs" rows="4" style="font-family:var(--mono);font-size:.82rem">' +
+      '<label class="field"><span>JavaScript</span><textarea name="starterJs" rows="4" style="font-family:var(--font-mono);font-size:.82rem">' +
       esc(d.starterJs) +
       "</textarea></label>" +
       "</fieldset>" +
@@ -2481,11 +2544,11 @@
     };
   }
 
-  /* ==================== CLICK HANDLER ==================== */
+  /* ---------- Click handler ---------- */
   document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-action]");
     if (!t) {
-      if (e.target.classList && e.target.classList.contains("modal-backdrop"))
+      if (e.target.classList && e.target.classList.contains("dialog-backdrop"))
         closeModal();
       return;
     }
@@ -2504,8 +2567,12 @@
         break;
 
       case "toggle-sidebar": {
-        $("#sidebar")?.classList.add("open");
-        $(".sidebar-backdrop")?.classList.add("show");
+        const sb = $("#sidebar");
+        const bd = $(".sidebar-backdrop");
+        if (!sb) break;
+        const isOpen = sb.classList.toggle("open");
+        bd?.classList.toggle("show", isOpen);
+        t.setAttribute("aria-expanded", String(isOpen));
         break;
       }
       case "close-sidebar": {
@@ -2531,17 +2598,17 @@
         go("student");
         break;
 
-      case "promo-timer":
-        go("student/timer");
+      case "add-question-prompt":
+        // used by teacher quiz editor "add question"
         break;
 
       /* teacher: modules */
       case "add-module":
-        openModal("New module", moduleFormHtml(null), { wide: true });
+        openDialog("New module", moduleFormHtml(null), { wide: true });
         break;
       case "edit-module": {
         const m = findModule(id);
-        if (m) openModal("Edit module", moduleFormHtml(m), { wide: true });
+        if (m) openDialog("Edit module", moduleFormHtml(m), { wide: true });
         break;
       }
       case "delete-module": {
@@ -2586,35 +2653,33 @@
         m.published = !m.published;
         save();
         render();
-        toast(m.published ? "Published." : "Unpublished.");
+        toast(m.published ? "Published." : "Moved back to draft.");
         break;
       }
 
       /* teacher: resources */
       case "add-resource":
-        openModal("New resource", resourceFormHtml(null), { wide: true });
+        openDialog("New resource", resourceFormHtml(null), { wide: true });
         break;
       case "edit-resource": {
         const r = state.curriculum.resources.find((x) => x.id === id);
-        if (r) openModal("Edit resource", resourceFormHtml(r), { wide: true });
+        if (r) openDialog("Edit resource", resourceFormHtml(r), { wide: true });
         break;
       }
       case "preview-resource": {
         const r = state.curriculum.resources.find((x) => x.id === id);
         if (!r) break;
-        openModal(
+        openDialog(
           "Preview: " + r.title,
-          '<div class="resource-card"><div class="ico">' +
-            ICONS.arrowR +
-            '</div><div class="meta">' +
-            '<div class="r-title">' +
+          "<div>" +
+            '<p style="font-weight:500">' +
             esc(r.title) +
-            "</div>" +
+            "</p>" +
             (r.description
-              ? '<div class="r-desc">' + esc(r.description) + "</div>"
+              ? '<p class="hint">' + esc(r.description) + "</p>"
               : "") +
             (r.url
-              ? '<p style="margin-top:.4rem"><a href="' +
+              ? '<p><a href="' +
                 esc(r.url) +
                 '" target="_blank" rel="noopener noreferrer">' +
                 esc(r.url) +
@@ -2625,7 +2690,7 @@
                 ? "<pre>" + esc(r.body) + "</pre>"
                 : "<p>" + esc(r.body) + "</p>"
               : "") +
-            "</div></div>",
+            "</div>",
         );
         break;
       }
@@ -2653,12 +2718,12 @@
 
       /* teacher: challenges */
       case "add-challenge":
-        openModal("New challenge", challengeFormHtml(null), { wide: true });
+        openDialog("New challenge", challengeFormHtml(null), { wide: true });
         break;
       case "edit-challenge": {
         const c = state.curriculum.challenges.find((x) => x.id === id);
         if (c)
-          openModal("Edit challenge", challengeFormHtml(c), { wide: true });
+          openDialog("Edit challenge", challengeFormHtml(c), { wide: true });
         break;
       }
       case "delete-challenge":
@@ -2682,11 +2747,11 @@
 
       /* teacher: quizzes + polls */
       case "add-quiz":
-        openModal("New quiz", quizFormHtml(null), { wide: true });
+        openDialog("New quiz", quizFormHtml(null), { wide: true });
         break;
       case "edit-quiz": {
         const q = state.curriculum.quizzes.find((x) => x.id === id);
-        if (q) openModal("Edit quiz", quizFormHtml(q), { wide: true });
+        if (q) openDialog("Edit quiz", quizFormHtml(q), { wide: true });
         break;
       }
       case "add-question": {
@@ -2699,7 +2764,7 @@
           answer: 0,
           explanation: "",
         });
-        openModal(
+        openDialog(
           form.dataset.id ? "Edit quiz" : "New quiz",
           quizFormHtml(draft),
           { wide: true },
@@ -2715,7 +2780,7 @@
           break;
         }
         draft.questions.splice(Number(t.dataset.index), 1);
-        openModal(
+        openDialog(
           form.dataset.id ? "Edit quiz" : "New quiz",
           quizFormHtml(draft),
           { wide: true },
@@ -2741,17 +2806,17 @@
         );
         break;
       case "add-poll":
-        openModal("New poll", pollFormHtml(null));
+        openDialog("New poll", pollFormHtml(null));
         break;
       case "edit-poll": {
         const p = state.curriculum.polls.find((x) => x.id === id);
-        if (p) openModal("Edit poll", pollFormHtml(p));
+        if (p) openDialog("Edit poll", pollFormHtml(p));
         break;
       }
       case "delete-poll":
         openConfirm(
           "Delete poll?",
-          "<p>It will disappear from the student roadmap.</p>",
+          "<p>It will disappear from the learner view.</p>",
           () => {
             state.curriculum.polls = state.curriculum.polls.filter(
               (p) => p.id !== id,
@@ -2781,7 +2846,7 @@
         writeRecord(myId(), m, { status: "completed", completedAt: nowISO() });
         save();
         render();
-        toast("Module marked complete.");
+        toast("Marked complete.");
         break;
       }
       case "send-feedback": {
@@ -2798,7 +2863,6 @@
         save();
         if (noteField) noteField.value = "";
         toast("Feedback saved.");
-        computeBadges(myId());
         break;
       }
       case "check-challenge":
@@ -2819,7 +2883,7 @@
           if (d.type === "log") out.textContent += d.text + "\n";
           else if (d.type === "error") {
             const s = document.createElement("span");
-            s.className = "err";
+            s.style.color = "var(--accent-2)";
             s.textContent = d.text + "\n";
             out.appendChild(s);
           }
@@ -2847,7 +2911,7 @@
         wrapper.querySelector('[data-code="js"]').value = def.js;
         bucket(myId()).drafts[scope] = def;
         save();
-        toast("Editor reset to starter code.");
+        toast("Editor reset.");
         break;
       }
       case "save-draft": {
@@ -2957,7 +3021,6 @@
       js: parts.js,
     };
     save();
-    if (!silent) computeBadges(myId());
   }
 
   async function checkChallenge(challengeId, moduleId) {
@@ -3016,11 +3079,9 @@
           : "Self-check recorded: " + ticked + " of " + total + ".",
       );
     }
-    computeBadges(myId());
     render();
   }
 
-  /* ==================== SUBMIT ==================== */
   document.addEventListener("submit", (e) => {
     const form = e.target.closest("form[data-form]");
     if (!form) return;
@@ -3036,12 +3097,25 @@
         return;
       }
       if (key !== acc.key) {
-        toast("That key does not match.");
+        toast("That key does not match. Check the demo keys.");
         return;
       }
       state.session = { accountId: acc.id, role: acc.role };
       save();
-      go(acc.role === "teacher" ? "teacher/curriculum" : "student");
+      go(acc.role === "teacher" ? "teacher" : "student");
+      return;
+    }
+
+    if (kind === "add-question") {
+      const text = String(fd.get("text") || "").trim();
+      if (!text) return;
+      const b = bucket(myId());
+      b.questions = b.questions || [];
+      b.questions.push({ id: uid("q"), text, at: nowISO() });
+      save();
+      form.reset();
+      render();
+      toast("Question added.");
       return;
     }
 
@@ -3201,28 +3275,10 @@
         at: nowISO(),
       });
       save();
-      computeBadges(myId());
       render();
       toast(
         "Score: " + score + " / " + quiz.questions.length + ". Retry any time.",
       );
-      return;
-    }
-
-    if (kind === "poll-answer") {
-      const chosen = form.querySelector('input[name="option"]:checked');
-      if (!chosen) {
-        toast("Pick an option first.");
-        return;
-      }
-      bucket(myId()).pollResponses.push({
-        pollId: form.dataset.poll,
-        optionIndex: Number(chosen.value),
-        at: nowISO(),
-      });
-      save();
-      render();
-      toast("Answer recorded.");
       return;
     }
 
@@ -3235,7 +3291,6 @@
     }
   });
 
-  /* ==================== VISIBILITY & BOOT ==================== */
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && timer.running) {
       pauseTimer();
@@ -3243,6 +3298,7 @@
     }
   });
 
+  /* ---------- Boot ---------- */
   function init() {
     state = loadState();
     ACCOUNTS.filter((a) => a.role === "student").forEach((a) => bucket(a.id));
