@@ -1,14 +1,23 @@
 /* =========================================================================
-   Orbit — Phase 1 application script
-   Same state shape, same STORAGE_KEY ('orbit.v3'), same SCHEMA_VERSION.
-   Rendering layer rewritten for the warm editorial workspace direction.
-   All non-home routes (lessons, playground, terminal, timer, data, quizzes
-   editor, module editor, resource editor) still dispatch to preserved
-   handlers and legacy render functions — Phase 2 will re-lay those out.
+   Orbit — app.js (Phase 1)
+   Warm editorial workspace. Same localStorage schema.
    ========================================================================= */
 
 (function () {
   "use strict";
+
+  // --- Defensive checks ---------------------------------------------------
+  // If lessons.js failed to load, we cannot proceed.
+  if (
+    typeof SCHEMA_VERSION === "undefined" ||
+    typeof ACCOUNTS === "undefined" ||
+    typeof starterCurriculum === "undefined" ||
+    typeof STORAGE_KEY === "undefined"
+  ) {
+    document.body.innerHTML =
+      '<div style="padding:2rem;font-family:sans-serif;color:#721c24;background:#f8d7da;border:1px solid #f5c6cb;border-radius:4px;margin:2rem;"><h2>Orbit could not start.</h2><p><strong>lessons.js</strong> is missing or failed to load. Please make sure it exists in the same folder as <code>index.html</code>.</p></div>';
+    return;
+  }
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -91,20 +100,18 @@
         try {
           localStorage.setItem("orbit.backup." + Date.now(), raw);
         } catch {}
-        toast(
-          "Saved data came from an older version. A backup was kept and a fresh store was started.",
-        );
+        console.warn("Orbit: Old schema detected. Backing up and resetting.");
         return defaultState();
       }
       parsed.curriculum = parsed.curriculum || starterCurriculum();
       parsed.progress = parsed.progress || {};
       parsed.ui = parsed.ui || { theme: "light" };
       return parsed;
-    } catch {
+    } catch (err) {
+      console.error("Orbit: Failed to parse state", err);
       try {
         localStorage.setItem("orbit.backup." + Date.now(), raw);
       } catch {}
-      toast("Saved data could not be read. A backup was kept.");
       return defaultState();
     }
   }
@@ -127,7 +134,7 @@
     } catch {}
   });
 
-  /* ---------- Data helpers (unchanged) ---------- */
+  /* ---------- Data helpers ---------- */
   function bucket(accountId) {
     if (!state.progress[accountId]) {
       state.progress[accountId] = {
@@ -139,7 +146,15 @@
         pollResponses: [],
         drafts: {},
         badges: [],
+        questions: [],
+        notes: [], // Added for Phase 1 home screen
       };
+    } else {
+      // Ensure new arrays exist for existing users
+      if (!state.progress[accountId].questions)
+        state.progress[accountId].questions = [];
+      if (!state.progress[accountId].notes)
+        state.progress[accountId].notes = [];
     }
     return state.progress[accountId];
   }
@@ -392,8 +407,7 @@
     );
   }
 
-  function shell(navItems, activePath, content, opts) {
-    opts = opts || {};
+  function shell(navItems, activePath, content) {
     const a = currentAccount();
     return (
       '<div class="app">' +
@@ -694,7 +708,6 @@
 
   function greetingFor(name) {
     const h = new Date().getHours();
-    const who = name.split(" ")[0];
     if (h < 12) return "Good morning";
     if (h < 18) return "Good afternoon";
     return "Good evening";
@@ -712,7 +725,6 @@
   }
 
   function buildFocusItems(accId) {
-    // Purposeful, optional suggestions. Not streaks, not rewards.
     const items = [];
     const inProg = publishedModules().find(
       (m) => readRecord(accId, m).status === "in-progress",
@@ -758,7 +770,7 @@
     return items.slice(0, 3);
   }
 
-  /* ---------- STUDENT lessons list (kept functional; Phase 2 will restyle) ---------- */
+  /* ---------- STUDENT lessons list ---------- */
   function studentLessonsList() {
     const accId = myId();
     const list = publishedModules();
@@ -986,13 +998,7 @@
     );
   }
 
-  /* =========================================================================
-     The functions below are preserved from the previous build so existing
-     routes (lesson detail, playground, terminal, timer, data, quiz editor,
-     module editor, resource editor, import/export) keep working with the
-     stored data. Phase 2 will re-lay-out each view.
-     ========================================================================= */
-
+  /* ---------- Lesson Detail ---------- */
   function studentLesson(moduleId) {
     const m = findModule(moduleId);
     if (!m || !m.published)
@@ -1561,105 +1567,7 @@
     render();
   }
 
-  /* ---------- Sandbox ---------- */
-  const SANDBOX_BOOT =
-    "<scr" +
-    "ipt>" +
-    "(function(){" +
-    '  function f(v){ try { return typeof v === "string" ? v : JSON.stringify(v); } catch(e){ return String(v); } }' +
-    '  function s(t,x){ parent.postMessage({ __orbit:true, type:t, text:String(x) }, "*"); }' +
-    '  ["log","warn","error","info"].forEach(function(k){' +
-    "    var o = console[k] ? console[k].bind(console) : function(){};" +
-    "    console[k] = function(){" +
-    '      var p = [].slice.call(arguments).map(f).join(" ");' +
-    "      o.apply(null, arguments);" +
-    '      s(k === "error" ? "error" : "log", p);' +
-    "    };" +
-    "  });" +
-    '  window.onerror = function(m, src, ln){ s("error", m + " (line " + ln + ")"); return true; };' +
-    '  window.addEventListener("unhandledrejection", function(e){' +
-    '    var r = e.reason; s("error", "Unhandled: " + (r && r.message ? r.message : r));' +
-    "  });" +
-    '  window.addEventListener("message", function(e){' +
-    '    if (!e.data || e.data.type !== "orbit:run") return;' +
-    "    try { new Function(e.data.code)(); }" +
-    '    catch (err) { s("error", (err && err.message) ? err.message : String(err)); }' +
-    '    s("done", "");' +
-    "  });" +
-    "})();" +
-    "</scr" +
-    "ipt>";
-
-  function buildDoc(html, css) {
-    return (
-      '<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;font-family:system-ui,sans-serif;color:#111;background:#fff}' +
-      String(css || "").replace(/<\/style/gi, "<\\/style") +
-      "</style></head><body>" +
-      String(html || "") +
-      SANDBOX_BOOT +
-      "</body></html>"
-    );
-  }
-  window.addEventListener("message", (event) => {
-    const data = event.data;
-    if (!data || data.__orbit !== true || typeof data.type !== "string") return;
-    for (const [iframe, handler] of sandboxHandlers) {
-      if (iframe.contentWindow === event.source) {
-        handler(data);
-        return;
-      }
-    }
-  });
-  function runSandbox(iframe, parts, onEvent) {
-    sandboxHandlers.set(iframe, onEvent);
-    iframe.onload = () => {
-      try {
-        iframe.contentWindow.postMessage(
-          { type: "orbit:run", code: parts.js || "" },
-          "*",
-        );
-      } catch {
-        onEvent({ type: "error", text: "Could not start preview." });
-      }
-    };
-    iframe.srcdoc = buildDoc(parts.html, parts.css);
-  }
-  function runSandboxAsync(code) {
-    return new Promise((resolve) => {
-      const iframe = document.createElement("iframe");
-      iframe.setAttribute("sandbox", "allow-scripts");
-      iframe.style.cssText =
-        "position:absolute;width:0;height:0;border:0;visibility:hidden;";
-      const lines = [];
-      let settled = false;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        sandboxHandlers.delete(iframe);
-        iframe.remove();
-        resolve(lines.join("\n"));
-      };
-      sandboxHandlers.set(iframe, (d) => {
-        if (d.type === "log" || d.type === "error") lines.push(d.text);
-        else if (d.type === "done") finish();
-      });
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        try {
-          iframe.contentWindow.postMessage(
-            { type: "orbit:run", code: code || "" },
-            "*",
-          );
-        } catch {
-          finish();
-        }
-      };
-      iframe.srcdoc = buildDoc("", "");
-      setTimeout(finish, 5000);
-    });
-  }
-
-  /* ---------- Data view (preserved; Phase 3 will restyle) ---------- */
+  /* ---------- Data view ---------- */
   function dataView() {
     return (
       '<div class="page-head"><div class="eyebrow">Share</div>' +
@@ -2598,10 +2506,6 @@
         go("student");
         break;
 
-      case "add-question-prompt":
-        // used by teacher quiz editor "add question"
-        break;
-
       /* teacher: modules */
       case "add-module":
         openDialog("New module", moduleFormHtml(null), { wide: true });
@@ -3300,18 +3204,26 @@
 
   /* ---------- Boot ---------- */
   function init() {
-    state = loadState();
-    ACCOUNTS.filter((a) => a.role === "student").forEach((a) => bucket(a.id));
-    if (
-      state.session &&
-      state.session.accountId !== VISITOR.id &&
-      !ACCOUNTS.some((a) => a.id === state.session.accountId)
-    ) {
-      state.session = null;
+    try {
+      state = loadState();
+      ACCOUNTS.filter((a) => a.role === "student").forEach((a) => bucket(a.id));
+      if (
+        state.session &&
+        state.session.accountId !== VISITOR.id &&
+        !ACCOUNTS.some((a) => a.id === state.session.accountId)
+      ) {
+        state.session = null;
+      }
+      save();
+      render();
+      window.addEventListener("hashchange", render);
+    } catch (err) {
+      console.error("Orbit: init failed", err);
+      document.body.innerHTML =
+        '<div style="padding:2rem;font-family:sans-serif;color:#721c24;background:#f8d7da;border:1px solid #f5c6cb;border-radius:4px;margin:2rem;"><h2>Orbit could not start.</h2><p>' +
+        err.message +
+        "</p></div>";
     }
-    save();
-    render();
-    window.addEventListener("hashchange", render);
   }
 
   if (document.readyState === "loading")
