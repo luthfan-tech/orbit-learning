@@ -8,7 +8,6 @@
   --lime-ink: #1b2606;
   --good: #0f9d58;
   --watch: #e0791b;
-  --great: #5b5bd6;
   --radius: 16px;
   --shadow: 0 6px 24px rgba(28, 27, 26, 0.06);
 }
@@ -28,7 +27,6 @@ body {
 a {
   color: inherit;
 }
-
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -42,6 +40,7 @@ a {
   align-items: center;
   gap: 0.55rem;
   font-weight: 800;
+  color: var(--ink);
 }
 .orbit-dot {
   width: 14px;
@@ -61,7 +60,6 @@ a {
 .crumbs a:hover {
   color: var(--ink);
 }
-
 main {
   max-width: 1100px;
   margin: 0 auto;
@@ -69,6 +67,7 @@ main {
 }
 .hero {
   padding: 2rem 0 1rem;
+  text-align: center;
 }
 .hero h1 {
   font-size: clamp(2rem, 5vw, 3rem);
@@ -84,7 +83,6 @@ main {
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
 }
-
 .grid {
   display: grid;
   gap: 1rem;
@@ -117,7 +115,6 @@ main {
   font-size: 0.85rem;
   margin: 0;
 }
-
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -139,7 +136,6 @@ main {
   color: var(--muted);
   text-transform: uppercase;
 }
-
 .bar {
   height: 10px;
   background: #f0eee7;
@@ -154,37 +150,6 @@ main {
   border-radius: 999px;
   transition: width 0.4s;
 }
-
-.lessons {
-  list-style: none;
-  padding: 0;
-  margin: 0.4rem 0 0.8rem;
-  display: grid;
-  gap: 0.3rem;
-}
-.lessons li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.88rem;
-}
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
-.dot.done {
-  background: var(--good);
-}
-.dot.active {
-  background: var(--watch);
-  box-shadow: 0 0 0 3px rgba(224, 121, 27, 0.18);
-}
-.dot.todo {
-  background: #cfccc4;
-}
-
 .feedback {
   font-size: 0.88rem;
   margin: 0;
@@ -199,7 +164,6 @@ main {
 .feedback.watch {
   border-color: var(--watch);
 }
-
 .foot {
   max-width: 1100px;
   margin: 0 auto;
@@ -217,7 +181,6 @@ main {
 .foot a:hover {
   color: var(--ink);
 }
-
 .page {
   text-align: center;
   padding-top: 4rem;
@@ -232,12 +195,19 @@ main {
   cursor: pointer;
   font-family: inherit;
   font-size: 1rem;
-  margin-top: 1rem;
   text-decoration: none;
   display: inline-block;
 }
-
-/* EDITOR STYLES */
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 0.7rem 1.1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+  font-family: inherit;
+}
 .floating-edit {
   position: fixed;
   bottom: 2rem;
@@ -249,39 +219,15 @@ main {
   border-radius: 999px;
   font-family: inherit;
   font-weight: 700;
-  cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 100;
 }
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(28, 27, 26, 0.4);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  background: var(--card);
-  padding: 2rem;
-  border-radius: var(--radius);
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-}
 .edit-group {
-  background: #faf9f5;
-  padding: 1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 1.5rem;
   border-radius: 12px;
-  margin-bottom: 1rem;
-}
-.edit-group h3 {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
+  box-shadow: var(--shadow);
 }
 .edit-row {
   display: flex;
@@ -296,32 +242,17 @@ main {
 .edit-group input,
 .edit-group textarea {
   width: 100%;
-  padding: 0.6rem;
+  padding: 0.8rem;
   margin-top: 0.3rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 1rem;
   background: #fff;
   color: var(--ink);
+  margin-bottom: 1rem;
 }
 .edit-group textarea {
   resize: vertical;
   min-height: 80px;
-}
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1.5rem;
-}
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--line);
-  padding: 0.7rem 1.1rem;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--muted);
-  font-family: inherit;
 }
