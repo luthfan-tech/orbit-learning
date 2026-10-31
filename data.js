@@ -1,22 +1,15 @@
-// ============================================
-// ORBIT DATA — edit this file to update students
-// ============================================
 window.ORBIT_DATA = {
-  meta: {
-    title: "Orbit — Learn & Build Together",
-    promise: "Pages load in under 2 seconds on a normal connection.",
-    updated: "2025-01-15",
-  },
+  meta: { updated: "Today" },
   students: [
     {
       id: "s1",
       name: "Aarav",
       avatar: "🦊",
-      focus: "HTML & CSS fundamentals",
+      focus: "HTML & CSS",
       streak: 6,
       hoursThisWeek: 7.5,
       hoursTotal: 42,
-      progress: 68, // 0–100
+      progress: 68,
       lessons: [
         { title: "Semantic HTML", status: "done" },
         { title: "Flexbox", status: "done" },
@@ -25,7 +18,7 @@ window.ORBIT_DATA = {
       ],
       feedback:
         "Great momentum this week. Needs to slow down and test layouts on real devices.",
-      tone: "good", // good | watch | great
+      tone: "good",
     },
     {
       id: "s2",

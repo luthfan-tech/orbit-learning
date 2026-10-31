@@ -1,17 +1,10 @@
 (function () {
-  // Load from LocalStorage OR fallback to data.js
   let D = JSON.parse(localStorage.getItem("orbit_data")) || window.ORBIT_DATA;
   if (!D) return;
 
-  const render = () => {
-    document.title = D.meta.title;
-    document.getElementById("promise").textContent = "⏱ " + D.meta.promise;
-    document.getElementById("updated").textContent =
-      "Last updated: " + D.meta.updated;
+  const renderUI = () => {
     document.getElementById("year").textContent = new Date().getFullYear();
-
-    const host = document.getElementById("students");
-    host.innerHTML = D.students
+    document.getElementById("students").innerHTML = D.students
       .map(
         (s) => `
       <article class="card">
@@ -39,30 +32,50 @@
       .join("");
   };
 
-  render();
+  // Handle simple hash routing for pages
+  const handleRoute = () => {
+    const hash = window.location.hash.replace("#", "");
+    const pages = ["dashboard", "privacy", "thankyou", "404"];
+    const current = pages.includes(hash) ? hash : "dashboard";
 
-  // EDITOR LOGIC - Clean & Direct
+    pages.forEach((p) => {
+      document.getElementById(`view-${p}`).hidden = p !== current;
+    });
+
+    // Update breadcrumbs
+    const crumb = document.getElementById("nav-crumbs");
+    if (current === "dashboard") {
+      crumb.innerHTML = `<span style="font-weight:600;color:var(--ink)">Dashboard</span>`;
+    } else {
+      crumb.innerHTML = `<a href="#">Home</a> › <span>${current}</span>`;
+    }
+  };
+
+  // Render and route on load
+  renderUI();
+  window.addEventListener("hashchange", handleRoute);
+  handleRoute();
+
+  // --- EDITOR LOGIC ---
   const modal = document.getElementById("editor-modal");
   const forms = document.getElementById("editor-forms");
 
   document.getElementById("open-editor").onclick = () => {
-    forms.innerHTML = "";
-
-    D.students.forEach((s, i) => {
-      const div = document.createElement("div");
-      div.className = "edit-group";
-      div.innerHTML = `
-        <h3>${s.name}</h3>
+    forms.innerHTML = D.students
+      .map(
+        (s, i) => `
+      <div class="edit-group">
+        <h3>${s.avatar || ""} ${s.name}</h3>
         <div class="edit-row">
           <label>Hrs this week <input type="number" step="0.5" id="hrs-${i}" value="${s.hoursThisWeek}"></label>
           <label>Total Hrs <input type="number" step="0.5" id="tot-${i}" value="${s.hoursTotal}"></label>
           <label>Progress (%) <input type="number" id="prog-${i}" value="${s.progress}"></label>
         </div>
         <label>Feedback <textarea id="fb-${i}">${s.feedback}</textarea></label>
-      `;
-      forms.appendChild(div);
-    });
-
+      </div>
+    `,
+      )
+      .join("");
     modal.hidden = false;
   };
 
@@ -79,9 +92,8 @@
       s.feedback = document.getElementById(`fb-${i}`).value;
     });
 
-    D.meta.updated = new Date().toLocaleDateString();
     localStorage.setItem("orbit_data", JSON.stringify(D));
-    render();
+    renderUI(); // Re-draw the cards instantly
     modal.hidden = true;
   };
 })();
