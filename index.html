@@ -55,6 +55,24 @@
       </span>
     </footer>
 
+    <!-- THE NEW REAL-WORLD EDITOR BUTTON -->
+    <button class="floating-edit" id="open-editor">✏️ Edit Data</button>
+
+    <!-- THE EDITOR MODAL -->
+    <div id="editor-modal" class="modal-overlay" hidden>
+      <div class="modal-content">
+        <h2>Update Student Data</h2>
+        <p class="muted" style="margin-bottom: 1rem">
+          Changes save directly to your browser. No code needed.
+        </p>
+        <div id="editor-forms"></div>
+        <div class="modal-actions">
+          <button class="btn-outline" id="close-editor">Cancel</button>
+          <button class="btn" id="save-editor">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
     <script src="data.js"></script>
     <script src="app.js"></script>
   </body>
